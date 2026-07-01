@@ -1,0 +1,60 @@
+[project]
+name = 'pr_PINN'
+version = '0.0.1'
+authors = [
+  { name='Francesco Colombo', email='francesco.colombo10@studio.unibo.it' },
+]
+description = 'Machine Learning in BOlogna Hypercode - Workflow for educative purposes in Software&Computing course '
+readme = 'README.md'
+requires-python = '>=3'
+license = {text = 'GPLv3'}
+keywords = [
+  'machine-learning',
+  'exercise',
+  'software-development',
+]
+maintainers = [
+  { name='Francesco Colombo', email='francesco.colombo10@studio.unibo.it' },
+]
+classifiers = [
+  'Natural Language :: English',
+  'Operating System :: MacOS :: MacOS X',
+  'Operating System :: POSIX',
+  'Operating System :: POSIX :: Linux',
+  'Operating System :: Microsoft :: Windows',
+  'Programming Language :: Python',
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3.5',
+  'Programming Language :: Python :: 3.6',
+  'Programming Language :: Python :: 3.7',
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.11',
+  'Programming Language :: Python :: Implementation :: CPython',
+  'Programming Language :: Python :: Implementation :: PyPy'
+]
+dependencies = [
+  'numpy',
+]
+
+[project.scripts]
+pr_PINN = "pr_PINN.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+  'flake8',
+  'pytest',
+  'codecov',
+  'pytest-cov',
+]
+
+[project.urls]
+'Homepage' = 'https://github.com/xover92/pr_PINN'
+'Bug Tracker' = 'https://github.com/xover92/pr_PINN/issues'
+
+[build-system]
+requires = [
+  'setuptools>=42',
+]
+build-backend = 'setuptools.build_meta'
