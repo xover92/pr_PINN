@@ -6,7 +6,7 @@ authors = [
 ]
 description = 'Machine Learning in BOlogna Hypercode - Workflow for educative purposes in Software&Computing course '
 readme = 'README.md'
-requires-python = '>=3'
+requires-python = '>=3.10'
 license = {text = 'GPLv3'}
 keywords = [
   'machine-learning',
@@ -23,12 +23,6 @@ classifiers = [
   'Operating System :: POSIX :: Linux',
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python',
-  'Programming Language :: Python :: 3',
-  'Programming Language :: Python :: 3.5',
-  'Programming Language :: Python :: 3.6',
-  'Programming Language :: Python :: 3.7',
-  'Programming Language :: Python :: 3.8',
-  'Programming Language :: Python :: 3.9',
   'Programming Language :: Python :: 3.10',
   'Programming Language :: Python :: 3.11',
   'Programming Language :: Python :: Implementation :: CPython',
@@ -36,6 +30,7 @@ classifiers = [
 ]
 dependencies = [
   'numpy',
+  'torch'
 ]
 
 [project.scripts]
