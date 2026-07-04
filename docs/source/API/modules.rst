@@ -4,5 +4,5 @@ Python API
 .. toctree::
    :maxdepth: 4
 
-   mlboh
+   pr_PINN
    
