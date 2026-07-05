@@ -108,8 +108,8 @@ def exact_solution_1D(x: torch.Tensor,
         The exact solution of the KPP-Fisher equation in 1D
     """
 
-    denominator = (((R/(2*D))**0.5)*(x-t*(2*R*D)**0.5))
-    exp = torch.exp(1/denominator)
+    exponent = (((R/(2*D))**0.5)*(x-t*(2*R*D)**0.5))
+    exp = torch.exp(exponent)
     exact_solution = 1/(1+exp)
     return exact_solution
 
@@ -139,7 +139,9 @@ def loss_function_1d(x: torch.Tensor,
     # adapt x,t to calculate the residual
     x_train, t_train = torch.meshgrid(x.squeeze(), t.squeeze(), indexing='xy')
     x_train = x_train.reshape(-1, 1)
+    # x_train.requires_grad = True
     t_train = t_train.reshape(-1, 1)
+    # t_train.requires_grad = True
 
     # initial condition loss
     u_pr = model(x, torch.zeros_like(x))
