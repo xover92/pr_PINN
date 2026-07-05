@@ -36,12 +36,7 @@ This is a project developed for the Pattern recognition and Software&Computing c
 
 ## Overview
 
-Write an overview about the context and/or project that you have developed.
-In the documentation you can use also fancy layouts, tables, and references to the code.
-
-| :triangular_flag_on_post: Note |
-|:-------------------------------|
-| This is an important note for your documentation! |
+This project, developed for the courses of Pattern Recognition and Software&computing for applied physics, consists of a PINN that solves the Fisher-KPP equation in 1D (2D and 3D coming soon). The program is developed with user-friendliness in mind, and as such runs on gradio, which allows it to have a simple GUI.
 
 ## Prerequisites
 
@@ -49,7 +44,7 @@ The complete list of requirements for the `pr_PINN` package is reported in the [
 
 ## Installation
 
-Python version supported : ![Python version](https://img.shields.io/badge/python-3.5|3.6|3.7|3.8|3.9|3.10|3.11|3.12|3.13-blue.svg)
+Python version supported : ![Python version](https://img.shields.io/badge/python-3.10|3.11|3.12|3.13-blue.svg)
 
 The `Python` installation for *developers* is executed using [`setup.py`](https://github.com/xover92/pr_PINN/blob/main/setup.py) script.
 
@@ -75,16 +70,8 @@ usage: pr_PINN [-h] [--version] --input INPUT [--parallel {threads,processes}] [
 options:
   -h, --help            show this help message and exit
   --version, -v         Get the current version installed
-  --input INPUT, -i INPUT
-                        The input file from which to read the data. The file must be in CSV format with the column of
-                        labels identified by the name "Y"; all the other columns will be interpreted as input
-                        columns/features
-  --parallel {threads,processes}, -p {threads,processes}
-                        Parallelization scheme to use for the ML cross-validation
-  --num-workers NUM_WORKERS, -n NUM_WORKERS
-                        The number of worker threads/processes to use for parallel computation. Default is 4.
 ```
-
+When ran, it will show a local link. By clicking on it, you will access the gradio GUI.
 ## Testing
 
 **TODO**
@@ -95,19 +82,15 @@ options:
 
 ## Contribution
 
-| :triangular_flag_on_post: Note |
-|:-------------------------------|
-| The following files are missing an they must be inserted/updated according to your needs/projects |
-
 No contribution is allowed, since this is a project meant for university.
 
 ## References
 
-<blockquote>1- Author et al, "Title", Journal, Year </blockquote>
+<blockquote>1- Aberqui et al, "Solving the Fisher nonlinear differential equations via Physics-Informed Neural Networks: A Comprehensive Retraining Study and Comparative Analysis with the Finite Difference Method", Numerical Analysis, 2026, https://arxiv.org/abs/2601.11406 </blockquote>
 
 ## Authors
 
-* <img src="https://avatars0.githubusercontent.com/u/24650975?s=400&v=4" width="25px"> [<img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" width="27px">](https://github.com/xover92) [<img src="https://cdn.rawgit.com/physycom/templates/697b327d/logo_unibo.png" width="25px">] **Francesco Colombo**
+* <img src="https://avatars.githubusercontent.com/u/149073278?v=4" width="25px"> **Francesco Colombo**
 
 See also the list of [contributors](https://github.com/xover92/pr_PINN/contributors) [![GitHub contributors](https://img.shields.io/github/contributors/xover92/pr_PINN.svg?style=plastic)](https://github.com/xover92/pr_PINN/graphs/contributors/) who participated in this project.
 
