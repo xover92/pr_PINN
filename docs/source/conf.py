@@ -9,7 +9,7 @@
 project = 'mlboh'
 copyright = '2026, Nico-Curti'
 author = 'Nico-Curti'
-release = '0.0.1'
+release = '0.0.2'
 
 master_doc = 'index'
 
@@ -17,14 +17,14 @@ master_doc = 'index'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-  'sphinx.ext.autodoc',
-  'sphinx.ext.napoleon',
-  'sphinx.ext.viewcode',
-  'sphinx.ext.intersphinx',
-  'sphinx_rtd_theme',
-  #'rst2pdf.pdfbuilder',
-  'nbsphinx',
-  'IPython.sphinxext.ipython_console_highlighting',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'sphinx_rtd_theme',
+    # 'rst2pdf.pdfbuilder',
+    'nbsphinx',
+    'IPython.sphinxext.ipython_console_highlighting',
 ]
 
 templates_path = ['_templates']
@@ -34,10 +34,10 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 autodoc_default_options = {
-  "members": True,
-  "undoc-members": True,
-  "private-members": True,
-  "show-inheritance": True,
+    "members": True,
+    "undoc-members": True,
+    "private-members": True,
+    "show-inheritance": True,
 }
 
 autodoc_typehints = "description"
@@ -52,11 +52,13 @@ html_static_path = ['_static']
 
 # Grouping the document tree into LaTeX files. List of tuples# (source start file, target name, title, author, documentclass [howto/manual]).
 latex_engine = 'xelatex'
-latex_documents = [('index', 'mlboh.tex', u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti', 'manual'),]
+latex_documents = [('index', 'mlboh.tex',
+                    u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti', 'manual'),]
 latex_show_pagerefs = True
 latex_domain_indices = False
 
-pdf_documents = [('index', u'mlboh', u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti'),]
+pdf_documents = [
+    ('index', u'mlboh', u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti'),]
 
 nbsphinx_input_prompt = 'In [%s]:'
 nbsphinx_kernel_name = 'python3'

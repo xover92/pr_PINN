@@ -6,23 +6,27 @@ class PINN_1d(nn.Module):
     """
     The PINN architecture in 1D.
 
-    Attributes:
-    hidden (nn.Sequential): the neural network architecture itself, which is
+    Parameters
+    ----------
+    n_neurons:int
+    Number of neurons
+    hidden (nn.Sequential)
+    the neural network architecture itself, which is
     composed by its 4 layers and their Tanh activation functions.
     """
 
-    def __init__(self):
+    def __init__(self, n_neurons: int = 50):
         super(PINN_1d, self).__init__()
         self.hidden = nn.Sequential(  # 4 layers neural network
-            nn.Linear(2, 50),
+            nn.Linear(2, n_neurons),
             nn.Tanh(),
-            nn.Linear(50, 50),
+            nn.Linear(n_neurons, n_neurons),
             nn.Tanh(),
-            nn.Linear(50, 50),
+            nn.Linear(n_neurons, n_neurons),
             nn.Tanh(),
-            nn.Linear(50, 50),
+            nn.Linear(n_neurons, n_neurons),
             nn.Tanh(),
-            nn.Linear(50, 1)
+            nn.Linear(n_neurons, 1)
         )
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
