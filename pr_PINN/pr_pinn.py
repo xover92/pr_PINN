@@ -3,6 +3,9 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
+model = None
+optimizer = None
+
 
 class PINN_1d(nn.Module):
     """

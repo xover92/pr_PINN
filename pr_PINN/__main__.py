@@ -10,8 +10,8 @@ __email__ = ['francesco.colombo10@studio.unibo.it']
 
 torch.manual_seed(42)
 
-model = None
-optimizer = None
+prp.model = None
+prp.optimizer = None
 
 
 demo = gr.Interface(
