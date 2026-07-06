@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 
 class PINN_1d(nn.Module):
@@ -134,8 +136,8 @@ def loss_function_1d(x: torch.Tensor,
     model:nn.Module
         The approximated u(x,t)
 
-    Returns:
-    --------
+    Returns
+    -------
     loss:float
         The loss function
     """
@@ -164,3 +166,92 @@ def loss_function_1d(x: torch.Tensor,
 
     # total loss
     return loss_bc+loss_ic+loss_pde
+
+
+def training_loop_1D(n_epochs: int, n_neurons: int) -> None:
+    """
+    Runs n_epochs loops to train the model as defined in pr_PINN_1d
+
+    Parameters
+    ----------
+    n_epochs:int
+    The number of epochs for the training loop.
+    n_neurons:int
+    The numer of neurons per layer.
+    """
+    global model, optimizer
+    model = PINN_1d(n_neurons)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    model.apply(lambda m: m.reset_parameters()
+                # reinitialize the model
+                if hasattr(m, 'reset_parameters') else None)
+
+    # generating training points
+    x = torch.linspace(0, 1, 200).view(-1, 1)
+    t = torch.linspace(0, 1, 200).view(-1, 1)
+
+    for epoch in range(n_epochs):
+        model.train()
+        loss = loss_function_1d(x, t, model)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    #    if (epoch) % 25 == 0 and (epoch) != 0:
+    #        text += f'epoch={epoch}, loss={loss.item():.4f}\n'
+
+        # if (epoch) == 0:
+        #    print("Starting.")
+    #    if (epoch) == n_epochs-1:
+    #        text += f'the final loss is: {loss}'
+    # return text
+
+
+def generate_plot_1d(n_epocs: int, n_neurons: int) -> Figure:
+    """
+    Runs the loop and then generates a side by side contour
+    plot of the correct solution and the one obtained by the PINN.
+
+    Parameters
+    ----------
+    n_epochs:int
+    The number of epochs for the loop
+    n_neurons:int
+    The numer of neurons per layer.
+
+    Returns
+    -------
+    fig:Figure
+    Returns the figure for gradio to show.
+    """
+    global model, optimizer
+
+    training_loop_1D(n_epocs, n_neurons)
+
+    x_test = torch.linspace(0, 1, 100).view(-1, 1)
+    t_test = torch.linspace(0, 1, 100).view(-1, 1)
+    x_test, t_test = torch.meshgrid(
+        x_test.squeeze(), t_test.squeeze(), indexing='xy')
+    x_test = x_test.reshape(-1, 1)
+    t_test = t_test.reshape(-1, 1)
+
+    model.eval()
+    with torch.no_grad():
+        u_pred = model(x_test, t_test).numpy()
+        u_exact = exact_solution_1D(x_test, t_test).numpy()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 4))
+
+    x_test = x_test.numpy().reshape(100, 100)
+    t_test = t_test.numpy().reshape(100, 100)
+    u_pred = u_pred.reshape(100, 100)
+    u_exact = u_exact.reshape(100, 100)
+
+    c1 = ax1.contourf(x_test, t_test, u_pred, levels=250, cmap='jet')
+    fig.colorbar(c1, ax=ax1)
+    c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
+    fig.colorbar(c2, ax=ax2)
+    plt.tight_layout()
+
+    return fig
