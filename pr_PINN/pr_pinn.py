@@ -3,9 +3,6 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-model = None
-optimizer = None
-
 
 class PINN_1d(nn.Module):
     """
@@ -171,7 +168,7 @@ def loss_function_1d(x: torch.Tensor,
     return loss_bc+loss_ic+loss_pde
 
 
-def training_loop_1D(n_epochs: int, n_neurons: int) -> None:
+def training_loop_1D(n_epochs: int, n_neurons: int) -> nn.Module:
     """
     Runs n_epochs loops to train the model as defined in pr_PINN_1d
 
@@ -181,8 +178,13 @@ def training_loop_1D(n_epochs: int, n_neurons: int) -> None:
     The number of epochs for the training loop.
     n_neurons:int
     The numer of neurons per layer.
+
+    Returns
+    -------
+    model:nn.Module
+    The trained PINN.
     """
-    global model, optimizer
+
     model = PINN_1d(n_neurons)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -201,11 +203,13 @@ def training_loop_1D(n_epochs: int, n_neurons: int) -> None:
         loss.backward()
         optimizer.step()
 
+    return model
+
     #    if (epoch) % 25 == 0 and (epoch) != 0:
     #        text += f'epoch={epoch}, loss={loss.item():.4f}\n'
 
-        # if (epoch) == 0:
-        #    print("Starting.")
+    # if (epoch) == 0:
+    #    print("Starting.")
     #    if (epoch) == n_epochs-1:
     #        text += f'the final loss is: {loss}'
     # return text
@@ -228,9 +232,8 @@ def generate_plot_1d(n_epocs: int, n_neurons: int) -> Figure:
     fig:Figure
     Returns the figure for gradio to show.
     """
-    global model, optimizer
 
-    training_loop_1D(n_epocs, n_neurons)
+    model = training_loop_1D(n_epocs, n_neurons)
 
     x_test = torch.linspace(0, 1, 100).view(-1, 1)
     t_test = torch.linspace(0, 1, 100).view(-1, 1)

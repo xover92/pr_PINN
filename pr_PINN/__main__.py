@@ -10,9 +10,6 @@ __email__ = ['francesco.colombo10@studio.unibo.it']
 
 torch.manual_seed(42)
 
-prp.model = None
-prp.optimizer = None
-
 
 demo = gr.Interface(
     fn=prp.generate_plot_1d,
