@@ -4,9 +4,9 @@
    contain the root `toctree` directive.
 
 pr_PINN
-=====
+=======
 
-This is an exam project developed during for the  Pattern recognition and Software&Computing 
+This is an exam project developed for the Pattern recognition and Software&Computing 
 courses of the Applied Physics curriculum.
 
 

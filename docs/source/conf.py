@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'mlboh'
-copyright = '2026, Nico-Curti'
-author = 'Nico-Curti'
+project = 'pr_PINN'
+copyright = '2026, Francesco-Colombo'
+author = 'Francesco-Colombo'
 release = '0.0.2'
 
 master_doc = 'index'
@@ -52,13 +52,13 @@ html_static_path = ['_static']
 
 # Grouping the document tree into LaTeX files. List of tuples# (source start file, target name, title, author, documentclass [howto/manual]).
 latex_engine = 'xelatex'
-latex_documents = [('index', 'mlboh.tex',
-                    u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti', 'manual'),]
+latex_documents = [('index', 'pr_PINN.tex',
+                    u'pr_PINN - PINN for pattern recognition course', u'Francesco Colombo', 'manual'),]
 latex_show_pagerefs = True
 latex_domain_indices = False
 
 pdf_documents = [
-    ('index', u'mlboh', u'mlboh - Machine Learning in BOlogna Hypercode', u'Nico Curti'),]
+    ('index', u'pr_PINN', u'PINN for pattern recognition course', u'Francesco Colombo'),]
 
 nbsphinx_input_prompt = 'In [%s]:'
 nbsphinx_kernel_name = 'python3'
