@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+from pr_PINN.pr_pinn import lhs_sample_generator
 
 
 class PINN_2d(nn.Module):
@@ -82,9 +83,6 @@ def pde_residual_2d(x: torch.Tensor, y: torch.Tensor,
         The residual of the KPP-Fisher equation
     """
 
-    x.requires_grad = True
-    y.requires_grad = True
-    t.requires_grad = True
     u = model(x, y, t)
 
     u_t = torch.autograd.grad(u, t, torch.ones_like(
@@ -119,23 +117,13 @@ def loss_function_2d(x: torch.Tensor,
     t:torch.Tensor
         The temporal coordinates
     model:nn.Module
-        The approximated u(x,t)
+        The approximated u(x, y, t)
 
     Returns
     -------
     loss:float
         The loss function
     """
-
-    # adapt x,y,t to calculate the residual
-    x_train, y_train, t_train = torch.meshgrid(
-        x.squeeze(), y.squeeze(), t.squeeze(), indexing='ij')
-    x_train = x_train.reshape(-1, 1)
-    # x_train.requires_grad = True
-    y_train = y_train.reshape(-1, 1)
-
-    t_train = t_train.reshape(-1, 1)
-    # t_train.requires_grad = True
 
     # initial condition loss
     u_pr = model(x, y, torch.zeros_like(x))
@@ -150,13 +138,14 @@ def loss_function_2d(x: torch.Tensor,
     loss_bc = torch.mean((u_0_pr-u_0_ex)**2)+torch.mean((u_1_pr-u_1_ex)**2)
 
     # residual loss
-    loss_pde = torch.mean(pde_residual_2d(x_train, y_train, t_train, model)**2)
+    loss_pde = torch.mean(pde_residual_2d(x, y, t, model)**2)
 
     # total loss
     return loss_bc+loss_ic+loss_pde
 
 
-def training_loop_2D(n_epochs: int, n_neurons: int) -> nn.Module:
+def training_loop_2D(n_epochs: int, n_neurons: int,
+                     n_points: int) -> nn.Module:
     """
     Runs n_epochs loops to train the model as defined in pr_PINN_2d
 
@@ -166,6 +155,8 @@ def training_loop_2D(n_epochs: int, n_neurons: int) -> nn.Module:
     The number of epochs for the training loop.
     n_neurons:int
     The numer of neurons per layer.
+    n_points:int
+    The number of points for LHS sampling.
 
     Returns
     -------
@@ -181,9 +172,7 @@ def training_loop_2D(n_epochs: int, n_neurons: int) -> nn.Module:
                 if hasattr(m, 'reset_parameters') else None)
 
     # generating training points
-    x = torch.linspace(0, 1, 50).view(-1, 1)
-    y = torch.linspace(0, 1, 50).view(-1, 1)
-    t = torch.linspace(0, 1, 50).view(-1, 1)
+    x, y, t = lhs_sample_generator(n_points, 3)
 
     for epoch in range(n_epochs):
         model.train()
@@ -194,17 +183,8 @@ def training_loop_2D(n_epochs: int, n_neurons: int) -> nn.Module:
 
     return model
 
-    #    if (epoch) % 25 == 0 and (epoch) != 0:
-    #        text += f'epoch={epoch}, loss={loss.item():.4f}\n'
 
-    # if (epoch) == 0:
-    #    print("Starting.")
-    #    if (epoch) == n_epochs-1:
-    #        text += f'the final loss is: {loss}'
-    # return text
-
-
-def generate_plot_2d(n_epocs: int, n_neurons: int) -> Figure:
+def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
     Runs the loop and then generates a voxel
     plot of solution obtained by the PINN.
@@ -215,6 +195,8 @@ def generate_plot_2d(n_epocs: int, n_neurons: int) -> Figure:
     The number of epochs for the loop
     n_neurons:int
     The numer of neurons per layer.
+    n_points:int
+    The number of points for LHS sampling.
 
     Returns
     -------
@@ -222,7 +204,7 @@ def generate_plot_2d(n_epocs: int, n_neurons: int) -> Figure:
     Returns the figure for gradio to show.
     """
 
-    model = training_loop_2D(n_epocs, n_neurons)
+    model = training_loop_2D(n_epocs, n_neurons, n_points)
 
     x_test = torch.linspace(0, 1, 100).view(-1, 1)
     y_test = torch.linspace(0, 1, 100).view(-1, 1)
