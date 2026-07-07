@@ -8,7 +8,7 @@ import numpy as np
 
 class PINN_3d(nn.Module):
     """
-    The PINN architecture in 2D.
+    The PINN architecture in 3D.
 
     Parameters
     ----------
@@ -37,7 +37,7 @@ class PINN_3d(nn.Module):
                 z: torch.Tensor,
                 t: torch.Tensor) -> torch.Tensor:
         """
-        The core method of the PINN, which approximates u(x, y, t).
+        The core method of the PINN, which approximates u(x, y, z, t).
 
         Parameters
         ----------
@@ -45,13 +45,15 @@ class PINN_3d(nn.Module):
             The x spatial coordinates
         y:torch.Tensor
             The y spatial coordinates
+        z:torch.Tensor
+            The z spatial coordinates
         t:torch.Tensor
             The temporal coordinates
 
         Returns
         -------
         u: torch.Tensor
-            the approximation of u(x, y, t)
+            the approximation of u(x, y, z, t)
         """
 
         inputs = torch.cat([x, y, z, t], dim=1)  # concatenate the inputs
@@ -62,7 +64,7 @@ def pde_residual_3d(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor,
                     t: torch.Tensor, model: nn.Module,
                     D: float = 0.1, R: float = 1) -> torch.Tensor:
     """
-    Calculates the residual of the KPP-Fisher equation in 2D.
+    Calculates the residual of the KPP-Fisher equation in 3D.
 
     Parameters
     ----------
@@ -70,6 +72,8 @@ def pde_residual_3d(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor,
         The x spatial coordinates
     y:torch.Tensor
         The y spatial coordinates
+    z:torch.Tensor
+        The z spatial coordinates
     t:torch.Tensor
         The temporal coordinates
     D:float=0.01
@@ -123,10 +127,12 @@ def loss_function_3d(x: torch.Tensor,
         The x spatial coordinates
     y:torch.Tensor
         The y spatial coordinates
+    z:torch.Tensor
+        The z spatial coordinates
     t:torch.Tensor
         The temporal coordinates
     model:nn.Module
-        The approximated u(x,t)
+        The approximated u(x, y, z, t)
 
     Returns
     -------
@@ -169,7 +175,7 @@ def loss_function_3d(x: torch.Tensor,
 
 def training_loop_3D(n_epochs: int, n_neurons: int) -> nn.Module:
     """
-    Runs n_epochs loops to train the model as defined in pr_PINN_2d
+    Runs n_epochs loops to train the model as defined in pr_PINN_3d
 
     Parameters
     ----------
@@ -219,7 +225,7 @@ def training_loop_3D(n_epochs: int, n_neurons: int) -> nn.Module:
 def generate_plot_3d(n_epocs: int, n_neurons: int) -> Figure:
     """
     Runs the loop and then generates a voxel
-    plot of solution obtained by the PINN.
+    plot of solution obtained by the PINN on a fixed time t=0.5.
 
     Parameters
     ----------
