@@ -145,7 +145,7 @@ def loss_function_2d(x: torch.Tensor,
 
 
 def training_loop_2D(n_epochs: int, n_neurons: int,
-                     n_points: int) -> nn.Module:
+                     n_points: int) -> tuple[nn.Module, list]:
     """
     Runs n_epochs loops to train the model as defined in pr_PINN_2d
 
@@ -162,6 +162,8 @@ def training_loop_2D(n_epochs: int, n_neurons: int,
     -------
     model:nn.Module
     The trained PINN.
+    loss_list:list
+    A list containing the loss every 10 epochs.
     """
 
     model = PINN_2d(n_neurons)
@@ -174,20 +176,25 @@ def training_loop_2D(n_epochs: int, n_neurons: int,
     # generating training points
     x, y, t = lhs_sample_generator(n_points, 3)
 
+    loss_list = []
+
     for epoch in range(n_epochs):
         model.train()
         loss = loss_function_2d(x, y, t, model)
+        if epoch % 10 == 0:
+            loss_list.append([loss.item(), epoch])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    return model
+    return model, loss_list
 
 
 def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
     Runs the loop and then generates a voxel
-    plot of solution obtained by the PINN.
+    plot of solution obtained by the PINN and a plot
+    of the loss evolution related to the epochs.
 
     Parameters
     ----------
@@ -204,7 +211,7 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     Returns the figure for gradio to show.
     """
 
-    model = training_loop_2D(n_epocs, n_neurons, n_points)
+    model, loss_list = training_loop_2D(n_epocs, n_neurons, n_points)
 
     x_test = torch.linspace(0, 1, 100).view(-1, 1)
     y_test = torch.linspace(0, 1, 100).view(-1, 1)
@@ -240,8 +247,19 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     colors = cm.viridis(norm(u_ds))
     colors[..., 3] = 1.0
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
+    fig = plt.figure(figsize=(10, 4))
+    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
+
+    losses = [item[0] for item in loss_list]
+    epochs = [item[1] for item in loss_list]
+
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(epochs, losses, label="loss")
+    ax2.set_yscale('log')
+    ax2.set_xlabel('epoch')
+    ax2.set_ylabel('loss')
+    ax2.grid(True)
+    plt.tight_layout()
 
     return fig

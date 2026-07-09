@@ -4,4 +4,4 @@
 __author__ = ['Francesco Colombo']
 __email__ = ['francesco.colombo10@studio.unibo.it']
 
-__version__ = '0.0.6'
+__version__ = '0.0.7'
