@@ -219,15 +219,18 @@ def training_loop_1D(n_epochs: int, n_neurons: int,
 
     # generating training points
     x, t = lhs_sample_generator(n_points, 2)
+    loss_list = []
 
     for epoch in range(n_epochs):
         model.train()
         loss = loss_function_1d(x, t, model)
+        if epoch % 10 == 0:
+            loss_list.append([loss.item(), epoch])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    return model
+    return model, loss_list
 
 
 def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
@@ -250,7 +253,7 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     Returns the figure for gradio to show.
     """
 
-    model = training_loop_1D(n_epocs, n_neurons, n_points)
+    model, loss_list = training_loop_1D(n_epocs, n_neurons, n_points)
 
     x_test = torch.linspace(0, 1, 100).view(-1, 1)
     t_test = torch.linspace(0, 1, 100).view(-1, 1)
@@ -264,7 +267,10 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
         u_pred = model(x_test, t_test).numpy()
         u_exact = exact_solution_1D(x_test, t_test).numpy()
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 4))
+    losses = [item[0] for item in loss_list]
+    epochs = [item[1] for item in loss_list]
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 4))
 
     x_test = x_test.numpy().reshape(100, 100)
     t_test = t_test.numpy().reshape(100, 100)
@@ -275,6 +281,11 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     fig.colorbar(c1, ax=ax1)
     c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
     fig.colorbar(c2, ax=ax2)
+    ax3.plot(epochs, losses, label="loss")
+    ax3.set_yscale('log')
+    ax3.set_xlabel('epoch')
+    ax3.set_ylabel('loss')
+    ax3.grid(True)
     plt.tight_layout()
 
     return fig
