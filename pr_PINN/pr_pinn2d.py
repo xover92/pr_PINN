@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 from pr_PINN.pr_pinn import lhs_sample_generator
+from fipy import CellVariable, Grid2D, TransientTerm, DiffusionTerm
 
 
 class PINN_2d(nn.Module):
@@ -131,11 +132,19 @@ def loss_function_2d(x: torch.Tensor,
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
     # boundary condition loss
-    u_0_pr = model(torch.zeros_like(t), torch.zeros_like(t), t)
-    u_0_ex = torch.zeros_like(t)
-    u_1_pr = model(torch.full_like(t, 1), torch.full_like(t, 1), t)
-    u_1_ex = torch.full_like(t, 1)
-    loss_bc = torch.mean((u_0_pr-u_0_ex)**2)+torch.mean((u_1_pr-u_1_ex)**2)
+    u_0_pr_0y = model(torch.zeros_like(y), y, t)
+    u_0_ex_0y = torch.zeros_like(y)
+    u_0_pr_x0 = model(x, torch.zeros_like(x), t)
+    u_0_ex_x0 = torch.zeros_like(t)
+
+    u_1_pr_1y = model(x, torch.full_like(x, 1), t)
+    u_1_ex_1y = torch.full_like(y, 1)
+    u_1_pr_x1 = model(torch.full_like(y, 1), y, t)
+    u_1_ex_x1 = torch.full_like(y, 1)
+    loss_bc = torch.mean((u_0_pr_0y-u_0_ex_0y)**2) + \
+        torch.mean((u_1_pr_1y-u_1_ex_1y)**2) + \
+        torch.mean((u_0_pr_x0-u_0_ex_x0)**2) + \
+        torch.mean((u_1_pr_x1-u_1_ex_x1)**2)
 
     # residual loss
     loss_pde = torch.mean(pde_residual_2d(x, y, t, model)**2)
@@ -190,11 +199,47 @@ def training_loop_2D(n_epochs: int, n_neurons: int,
     return model, loss_list
 
 
+def solve_with_fipy_2d() -> list:
+    """
+    Solves the 2d equation with fipy
+
+    Returns
+    -------
+    history:list
+    A list containing u(x, y, t) for 100x100x100 data points
+    """
+
+    nx = 100
+    ny = nx
+    dx = 0.01
+    dy = dx
+    mesh = Grid2D(dx=dx, dy=dy, nx=nx, ny=ny)
+
+    phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
+
+    eq = TransientTerm() == DiffusionTerm(coeff=0.1) + phi*(1-phi)
+
+    phi.constrain(0.0, where=mesh.facesLeft | mesh.facesBottom)
+    phi.constrain(1.0, where=mesh.facesRight | mesh.facesTop)
+
+    steps = 100
+    history = []
+    t = 0
+    for step in range(steps):
+        eq.solve(var=phi,
+                 dt=0.01)
+        t += 0.01
+        history.append((np.array(phi.value).reshape((nx, ny)), t))
+
+    return history
+
+
 def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
     Runs the loop and then generates a voxel
     plot of solution obtained by the PINN and a plot
-    of the loss evolution related to the epochs.
+    of the loss evolution related to the epochs,
+    compared with a voxel plot of the fipy solution.
 
     Parameters
     ----------
@@ -212,6 +257,7 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
 
     model, loss_list = training_loop_2D(n_epocs, n_neurons, n_points)
+    history = solve_with_fipy_2d()
 
     x_test = torch.linspace(0, 1, 100).view(-1, 1)
     y_test = torch.linspace(0, 1, 100).view(-1, 1)
@@ -247,14 +293,29 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     colors = cm.viridis(norm(u_ds))
     colors[..., 3] = 1.0
 
-    fig = plt.figure(figsize=(10, 4))
-    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    fipy_matrices = [item[0] if isinstance(
+        item, (tuple, list)) else item for item in history]
+    u_exact = np.stack(fipy_matrices, axis=-1)
+    u_exact_ds = u_exact[::ds, ::ds, ::ds]
+
+    colors_exact = cm.viridis(norm(u_exact_ds))
+    colors_exact[..., 3] = 1.0
+
+    fig = plt.figure(figsize=(16, 5))
+    ax1 = fig.add_subplot(1, 3, 1, projection='3d')
     ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
+
+    ax1.set_title("Prediction (PINN)")
+
+    ax_exact = fig.add_subplot(1, 3, 2, projection='3d')
+    ax_exact.voxels(voxels, facecolors=colors_exact,
+                    edgecolor='k', linewidth=0.2)
+    ax_exact.set_title("Exact (FiPy)")
 
     losses = [item[0] for item in loss_list]
     epochs = [item[1] for item in loss_list]
 
-    ax2 = fig.add_subplot(1, 2, 2)
+    ax2 = fig.add_subplot(1, 3, 3)
     ax2.plot(epochs, losses, label="loss")
     ax2.set_yscale('log')
     ax2.set_xlabel('epoch')

@@ -25,9 +25,9 @@ def choose_dimensions(n_epochs, n_neurons, n_dimensions, n_points):
 
 demo = gr.Interface(
     fn=choose_dimensions,
-    inputs=[gr.Slider(maximum=5000), gr.Slider(),
+    inputs=[gr.Slider(maximum=10000), gr.Slider(),
             gr.Slider(minimum=1, maximum=3, step=1.0),
-            gr.Slider(maximum=5000)],
+            gr.Slider(maximum=10000)],
     outputs=gr.Plot(),
     api_name="predict"
 )

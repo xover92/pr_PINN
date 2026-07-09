@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 from pr_PINN.pr_pinn import lhs_sample_generator
+from fipy import CellVariable, Grid3D, TransientTerm, DiffusionTerm
 
 
 class PINN_3d(nn.Module):
@@ -143,13 +144,27 @@ def loss_function_3d(x: torch.Tensor,
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
     # boundary condition loss
-    u_0_pr = model(torch.zeros_like(t), torch.zeros_like(t),
-                   torch.zeros_like(t), t)
-    u_0_ex = torch.zeros_like(t)
-    u_1_pr = model(torch.full_like(t, 1), torch.full_like(
-        t, 1), torch.full_like(t, 1), t)
-    u_1_ex = torch.full_like(t, 1)
-    loss_bc = torch.mean((u_0_pr-u_0_ex)**2)+torch.mean((u_1_pr-u_1_ex)**2)
+    u_0_pr_0yz = model(torch.zeros_like(t), y,
+                       z, t)
+    u_0_ex_0yz = torch.zeros_like(t)
+    u_0_pr_x0z = model(x, torch.zeros_like(t),
+                       z, t)
+    u_0_ex_x0z = torch.zeros_like(t)
+    u_0_pr_xy0 = model(x, y, torch.zeros_like(t),
+                       t)
+    u_0_ex_xy0 = torch.zeros_like(t)
+    u_1_pr_1yz = model(torch.full_like(t, 1), y, z, t)
+    u_1_ex_1yz = torch.full_like(t, 1)
+    u_1_pr_x1z = model(x, torch.full_like(t, 1), z, t)
+    u_1_ex_x1z = torch.full_like(t, 1)
+    u_1_pr_xy1 = model(x, y, torch.full_like(t, 1), t)
+    u_1_ex_xy1 = torch.full_like(t, 1)
+    loss_bc = torch.mean((u_0_pr_0yz-u_0_ex_0yz)**2) + \
+        torch.mean((u_0_pr_xy0-u_0_ex_xy0)**2) + \
+        torch.mean((u_0_pr_x0z-u_0_ex_x0z)**2) + \
+        torch.mean((u_1_pr_1yz-u_1_ex_1yz)**2) + \
+        torch.mean((u_1_pr_x1z-u_1_ex_x1z)**2) + \
+        torch.mean((u_1_pr_xy1-u_1_ex_xy1)**2)
 
     # residual loss
     loss_pde = torch.mean(pde_residual_3d(
@@ -157,6 +172,36 @@ def loss_function_3d(x: torch.Tensor,
 
     # total loss
     return loss_bc+loss_ic+loss_pde
+
+
+def solve_with_fipy_3d():
+
+    nx = 20
+    ny = nx
+    dx = 0.05
+    dy = dx
+    nz = nx
+    dz = dx
+
+    mesh = Grid3D(dx=dx, dy=dy, dz=dz, nx=nx, ny=ny, nz=nz)
+
+    phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
+
+    eq = TransientTerm() == DiffusionTerm(coeff=0.1) + phi*(1-phi)
+
+    phi.constrain(0.0, where=mesh.facesLeft |
+                  mesh.facesBottom | mesh.facesFront)
+    phi.constrain(1.0, where=mesh.facesRight | mesh.facesTop | mesh.facesBack)
+
+    # steps = 20
+    history = []
+    # t = 0
+    # for step in range(steps):
+    eq.solve(var=phi,
+             dt=0.5)
+    history.append((np.array(phi.value).reshape((nx, ny, nz))))
+
+    return history
 
 
 def training_loop_3D(n_epochs: int, n_neurons: int,
@@ -206,7 +251,9 @@ def training_loop_3D(n_epochs: int, n_neurons: int,
 def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
     Runs the loop and then generates a voxel
-    plot of solution obtained by the PINN on a fixed time t=0.5.
+    plot of solution obtained by the PINN on a fixed time t=0.5, compared
+    with the one obtained by fipy, and the evolution of the loss
+    with the epochs.
 
     Parameters
     ----------
@@ -224,11 +271,12 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
 
     model, loss_list = training_loop_3D(n_epocs, n_neurons, n_points)
+    history = solve_with_fipy_3d()
 
-    x_test = torch.linspace(0, 1, 100).view(-1, 1)
-    y_test = torch.linspace(0, 1, 100).view(-1, 1)
-    z_test = torch.linspace(0, 1, 100).view(-1, 1)
-    t_test = torch.linspace(0, 1, 100).view(-1, 1)
+    x_test = torch.linspace(0, 1, 20).view(-1, 1)
+    y_test = torch.linspace(0, 1, 20).view(-1, 1)
+    z_test = torch.linspace(0, 1, 20).view(-1, 1)
+    t_test = torch.linspace(0, 1, 20).view(-1, 1)
     x_test, y_test, z_test = torch.meshgrid(
         x_test.squeeze(), y_test.squeeze(), z_test.squeeze(), indexing='ij')
     x_test = x_test.reshape(-1, 1)
@@ -241,12 +289,12 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
         u_pred = model(x_test, y_test, z_test,
                        torch.full_like(x_test, 0.5)).numpy()
 
-    x_test = x_test.numpy().reshape(100, 100, 100)
-    y_test = y_test.numpy().reshape(100, 100, 100)
-    z_test = z_test.numpy().reshape(100, 100, 100)
-    u_pred = u_pred.reshape(100, 100, 100)
+    x_test = x_test.numpy().reshape(20, 20, 20)
+    y_test = y_test.numpy().reshape(20, 20, 20)
+    z_test = z_test.numpy().reshape(20, 20, 20)
+    u_pred = u_pred.reshape(20, 20, 20)
 
-    ds = 5
+    ds = 1
     x_ds = x_test[::ds, ::ds, ::ds]
     y_ds = y_test[::ds, ::ds, ::ds]
     z_ds = z_test[::ds, ::ds, ::ds]
@@ -262,14 +310,25 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     colors = cm.viridis(norm(u_ds))
     colors[..., 3] = 1.0
 
-    fig = plt.figure(figsize=(10, 4))
-    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    u_exact = history[0]
+    u_exact_ds = u_exact[::ds, ::ds, ::ds]
+
+    colors_exact = cm.viridis(norm(u_exact_ds))
+    colors_exact[..., 3] = 1.0
+
+    fig = plt.figure(figsize=(16, 5))
+    ax1 = fig.add_subplot(1, 3, 1, projection='3d')
     ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
+
+    ax_exact = fig.add_subplot(1, 3, 2, projection='3d')
+    ax_exact.voxels(voxels, facecolors=colors_exact,
+                    edgecolor='k', linewidth=0.2)
+    ax_exact.set_title("Exact (FiPy)")
 
     losses = [item[0] for item in loss_list]
     epochs = [item[1] for item in loss_list]
 
-    ax2 = fig.add_subplot(1, 2, 2)
+    ax2 = fig.add_subplot(1, 3, 3)
     ax2.plot(epochs, losses, label="loss")
     ax2.set_yscale('log')
     ax2.set_xlabel('epoch')
