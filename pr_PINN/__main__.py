@@ -4,7 +4,7 @@
 import pr_PINN.pr_pinn as prp
 import torch
 import gradio as gr
-import pr_PINN.pr_prinn2d as prp2
+import pr_PINN.pr_pinn2d as prp2
 import pr_PINN.pr_pinn3d as prp3
 
 __author__ = ['Francesco Colombo']

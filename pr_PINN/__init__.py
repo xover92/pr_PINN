@@ -3,7 +3,7 @@
 
 from .__version__ import __version__
 from pr_PINN.pr_pinn import PINN_1d
-from pr_PINN.pr_prinn2d import PINN_2d
+from pr_PINN.pr_pinn2d import PINN_2d
 
 __author__ = ['Francesco Colombo']
 __email__ = ['francesco.colombo10@studio.unibo.it']

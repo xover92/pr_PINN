@@ -10,7 +10,7 @@ pr_PINN_1d
 pr_PINN_2d
 ----------
 
-.. automodule:: pr_PINN.pr_prinn2d
+.. automodule:: pr_PINN.pr_pinn2d
    :members:
    :undoc-members:
    :private-members:
