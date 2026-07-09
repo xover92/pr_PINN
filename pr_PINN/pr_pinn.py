@@ -191,7 +191,7 @@ def loss_function_1d(x: torch.Tensor,
 
 
 def training_loop_1D(n_epochs: int, n_neurons: int,
-                     n_points: int) -> nn.Module:
+                     n_points: int) -> tuple[nn.Module, list]:
     """
     Runs n_epochs loops to train the model as defined in pr_PINN_1d
 
@@ -208,6 +208,8 @@ def training_loop_1D(n_epochs: int, n_neurons: int,
     -------
     model:nn.Module
     The trained PINN.
+    loss_list:list
+    A list containing the loss every 10 epochs.
     """
 
     model = PINN_1d(n_neurons)
@@ -236,7 +238,8 @@ def training_loop_1D(n_epochs: int, n_neurons: int,
 def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     """
     Runs the loop and then generates a side by side contour
-    plot of the correct solution and the one obtained by the PINN.
+    plot of the correct solution and the one obtained by the PINN
+    and a plot of the loss related to the epochs.
 
     Parameters
     ----------
