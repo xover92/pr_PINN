@@ -65,13 +65,18 @@ The `pr_PINN` package can be used directly via command line using the following 
 
 ```bash
 $ pr_PINN --help
-usage: pr_PINN [-h] [--version] --input INPUT [--parallel {threads,processes}] [--num-workers NUM_WORKERS]
+usage: pr_PINN [-h] [--version]
 
 options:
   -h, --help            show this help message and exit
   --version, -v         Get the current version installed
 ```
-When ran, it will show a local link. By clicking on it, you will access the gradio GUI.
+
+In order to run it, type:
+```bash
+$ python -m pr_PINN
+```
+When ran, it will show a local link. By clicking on it, you will access the gradio GUI, where you will be able to test the program.
 ## Testing
 
 **TODO**
