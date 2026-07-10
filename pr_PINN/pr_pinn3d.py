@@ -174,7 +174,15 @@ def loss_function_3d(x: torch.Tensor,
     return loss_bc+loss_ic+loss_pde
 
 
-def solve_with_fipy_3d():
+def solve_with_fipy_3d() -> list:
+    """
+    Solves the 3d equation with fipy
+
+    Returns
+    -------
+    history:list
+    A list containing u(x, y, t) for 20x20x20 data points
+    """
 
     nx = 20
     ny = nx
@@ -193,19 +201,20 @@ def solve_with_fipy_3d():
                   mesh.facesBottom | mesh.facesFront)
     phi.constrain(1.0, where=mesh.facesRight | mesh.facesTop | mesh.facesBack)
 
-    # steps = 20
+    steps = 20
     history = []
-    # t = 0
-    # for step in range(steps):
-    eq.solve(var=phi,
-             dt=0.5)
-    history.append((np.array(phi.value).reshape((nx, ny, nz))))
+    t = 0.05
+    for step in range(steps):
+        eq.solve(var=phi,
+                 dt=0.05)
+        t += 0.05
+        history.append(((np.array(phi.value).reshape((nx, ny, nz))), t))
 
     return history
 
 
 def training_loop_3D(n_epochs: int, n_neurons: int,
-                     n_points: int) -> nn.Module:
+                     n_points: int) -> tuple[nn.Module, str]:
     """
     Runs n_epochs loops to train the model as defined in pr_PINN_3d
 
@@ -222,6 +231,8 @@ def training_loop_3D(n_epochs: int, n_neurons: int,
     -------
     model:nn.Module
     The trained PINN.
+    l2_loss:str
+    A text containing the l2_loss
     """
 
     model = PINN_3d(n_neurons)
@@ -277,27 +288,37 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     y_test = torch.linspace(0, 1, 20).view(-1, 1)
     z_test = torch.linspace(0, 1, 20).view(-1, 1)
     t_test = torch.linspace(0, 1, 20).view(-1, 1)
-    x_test, y_test, z_test = torch.meshgrid(
+    x_test_p, y_test_p, z_test_p = torch.meshgrid(
         x_test.squeeze(), y_test.squeeze(), z_test.squeeze(), indexing='ij')
-    x_test = x_test.reshape(-1, 1)
-    y_test = y_test.reshape(-1, 1)
-    z_test = z_test.reshape(-1, 1)
+
+    x_loss, y_loss, z_loss, t_loss = torch.meshgrid(
+        x_test.squeeze(), y_test.squeeze(), z_test.squeeze(),
+        t_test.squeeze(), indexing='ij')
+    x_loss = x_loss.reshape(-1, 1)
+    y_loss = y_loss.reshape(-1, 1)
+    z_loss = z_loss.reshape(-1, 1)
+    t_loss = t_loss.reshape(-1, 1)
+
+    x_test_p = x_test_p.reshape(-1, 1)
+    y_test_p = y_test_p.reshape(-1, 1)
+    z_test_p = z_test_p.reshape(-1, 1)
     t_test = t_test.reshape(-1, 1)
 
     model.eval()
     with torch.no_grad():
-        u_pred = model(x_test, y_test, z_test,
-                       torch.full_like(x_test, 0.5)).numpy()
+        u_pred = model(x_test_p, y_test_p, z_test_p,
+                       torch.full_like(x_test_p, 0.5)).numpy()
+        u_pred_tensor = model(x_loss, y_loss, z_loss, t_loss)
 
-    x_test = x_test.numpy().reshape(20, 20, 20)
-    y_test = y_test.numpy().reshape(20, 20, 20)
-    z_test = z_test.numpy().reshape(20, 20, 20)
+    x_test_p = x_test_p.numpy().reshape(20, 20, 20)
+    y_test_p = y_test_p.numpy().reshape(20, 20, 20)
+    z_test_p = z_test_p.numpy().reshape(20, 20, 20)
     u_pred = u_pred.reshape(20, 20, 20)
 
     ds = 1
-    x_ds = x_test[::ds, ::ds, ::ds]
-    y_ds = y_test[::ds, ::ds, ::ds]
-    z_ds = z_test[::ds, ::ds, ::ds]
+    x_ds = x_test_p[::ds, ::ds, ::ds]
+    y_ds = y_test_p[::ds, ::ds, ::ds]
+    z_ds = z_test_p[::ds, ::ds, ::ds]
     u_ds = u_pred[::ds, ::ds, ::ds]
 
     grid_shape = x_ds.shape
@@ -310,12 +331,16 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     colors = cm.viridis(norm(u_ds))
     colors[..., 3] = 1.0
 
-    u_exact = history[0]
+    u_exact = history[9][0]
     u_exact_ds = u_exact[::ds, ::ds, ::ds]
+
+    fipy_matrices = [item[0] if isinstance(
+        item, (tuple, list)) else item for item in history]
+    u_exact_t = np.stack(fipy_matrices, axis=-1)
+    u_exact_tensor = torch.Tensor(u_exact_t).reshape(-1, 1)
 
     colors_exact = cm.viridis(norm(u_exact_ds))
     colors_exact[..., 3] = 1.0
-
     fig = plt.figure(figsize=(16, 5))
     ax1 = fig.add_subplot(1, 3, 1, projection='3d')
     ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
@@ -336,4 +361,8 @@ def generate_plot_3d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     ax2.grid(True)
     plt.tight_layout()
 
-    return fig
+    l2_loss = nn.functional.mse_loss(u_exact_tensor, u_pred_tensor)
+
+    l2_loss_text = f'L2 loss={l2_loss}'
+
+    return fig, l2_loss_text

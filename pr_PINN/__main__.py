@@ -28,7 +28,8 @@ demo = gr.Interface(
     inputs=[gr.Slider(maximum=10000), gr.Slider(),
             gr.Slider(minimum=1, maximum=3, step=1.0),
             gr.Slider(maximum=10000)],
-    outputs=gr.Plot(),
+    outputs=[gr.Plot(label='Solution comparison and loss progression'),
+             gr.Text(label='L2 loss')],
     api_name="predict"
 )
 

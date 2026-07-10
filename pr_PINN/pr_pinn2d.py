@@ -234,12 +234,15 @@ def solve_with_fipy_2d() -> list:
     return history
 
 
-def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
+def generate_plot_2d(n_epocs: int, n_neurons: int,
+                     n_points: int) -> tuple[Figure, str]:
     """
     Runs the loop and then generates a voxel
     plot of solution obtained by the PINN and a plot
     of the loss evolution related to the epochs,
     compared with a voxel plot of the fipy solution.
+    Then, returns also the l2 loss in respect to
+    the fipy calculated solution.
 
     Parameters
     ----------
@@ -254,6 +257,8 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     -------
     fig:Figure
     Returns the figure for gradio to show.
+    l2_loss:str
+    Returns a string indicationg the l2_loss.
     """
 
     model, loss_list = training_loop_2D(n_epocs, n_neurons, n_points)
@@ -271,6 +276,7 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     model.eval()
     with torch.no_grad():
         u_pred = model(x_test, y_test, t_test).numpy()
+        u_pred_tensor = model(x_test, y_test, t_test)
 
     x_test = x_test.numpy().reshape(100, 100, 100)
     y_test = y_test.numpy().reshape(100, 100, 100)
@@ -323,4 +329,9 @@ def generate_plot_2d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     ax2.grid(True)
     plt.tight_layout()
 
-    return fig
+    tensor_exact = torch.Tensor(u_exact).reshape(-1, 1)
+    l2_loss = nn.functional.mse_loss(tensor_exact, u_pred_tensor)
+
+    l2_loss_text = f'L2 loss={l2_loss}'
+
+    return fig, l2_loss_text

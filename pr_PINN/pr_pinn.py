@@ -235,7 +235,8 @@ def training_loop_1D(n_epochs: int, n_neurons: int,
     return model, loss_list
 
 
-def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
+def generate_plot_1d(n_epocs: int, n_neurons: int,
+                     n_points: int) -> tuple[Figure, str]:
     """
     Runs the loop and then generates a side by side contour
     plot of the correct solution and the one obtained by the PINN
@@ -254,6 +255,8 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     -------
     fig:Figure
     Returns the figure for gradio to show.
+    l2_loss:str
+    Returns the l2_loss in respect to the exact solution.
     """
 
     model, loss_list = training_loop_1D(n_epocs, n_neurons, n_points)
@@ -268,7 +271,9 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     model.eval()
     with torch.no_grad():
         u_pred = model(x_test, t_test).numpy()
+        u_pred_l2 = model(x_test, t_test)
         u_exact = exact_solution_1D(x_test, t_test).numpy()
+        u_exact_l2 = exact_solution_1D(x_test, t_test)
 
     losses = [item[0] for item in loss_list]
     epochs = [item[1] for item in loss_list]
@@ -291,4 +296,8 @@ def generate_plot_1d(n_epocs: int, n_neurons: int, n_points: int) -> Figure:
     ax3.grid(True)
     plt.tight_layout()
 
-    return fig
+    l2_loss = nn.functional.mse_loss(u_pred_l2, u_exact_l2)
+
+    text_l2 = f'L2 loss={l2_loss}'
+
+    return fig, text_l2
