@@ -63,7 +63,7 @@ def test_pde_residual_1d(quad_dummy_model, x_res_1d, t_res_1d, exp_res_1d):
 def test_pde_residual_2d(quad_dummy_model, x_res, y_res, t_res, exp_res):
     """
     Tests wheter the residual is computed correctly, evaluating in the
-    boundaries and in a generic point for the function x^2+t.
+    boundaries and in a generic point for the function x^2+y^2+t.
     """
     x = torch.tensor([[x_res]], requires_grad=True)
     y = torch.tensor([[y_res]], requires_grad=True)
@@ -95,7 +95,7 @@ def test_pde_residual_3d(quad_dummy_model, x_res, y_res, z_res,
                          t_res, exp_res):
     """
     Tests wheter the residual is computed correctly, evaluating in the
-    boundaries and in a generic point for the function x^2+t.
+    boundaries and in a generic point for the function x^2+y^2+z^2+t.
     """
     x = torch.tensor([[x_res]], requires_grad=True)
     y = torch.tensor([[y_res]], requires_grad=True)
@@ -143,7 +143,7 @@ def test_loss_1d(x_val, t_val, oracle):
     """
     Tests whete the loss is computed correclty by employing oracle testing.
     More precisely, it calculates the loss for the exact solution and
-    checks wheter it is close to 0, with a tolerance of 1e-3.
+    checks wheter it is close to 0, with a tolerance of 1e-4.
     """
     x = torch.tensor([[x_val]])
     t = torch.tensor([[t_val]])
