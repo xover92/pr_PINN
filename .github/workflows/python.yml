@@ -39,8 +39,9 @@ jobs:
         python -m pip install .
     - name: Test with pytest
       run: |
-        python -m pytest ./test/ --cov=pr_PINN --cov-report=xml --cov-config=.coveragerc
+        python -m pytest ./test/ --cov=pr_PINN --cov-report=xml
     - name: Upload coverage reports to Codacy
       uses: codacy/codacy-coverage-reporter-action@v1
       with:
-        token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        coverage-reports: coverage.xml
