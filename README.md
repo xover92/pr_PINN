@@ -14,7 +14,7 @@
   </div>
 </a>
 
-# pr_PINN v0.1.0
+# pr_PINN v0.1.1
 
 ## Project for the Pattern recognition and Software&Computing course (aa 2025-26)
 

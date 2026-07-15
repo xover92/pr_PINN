@@ -95,7 +95,7 @@ def lhs_sample_generator(n_points: int,
 
 def pde_residual(*coordinates: torch.Tensor,
                  t: torch.Tensor, model: nn.Module,
-                 D: float = 0.1, R: float = 1) -> torch.Tensor:
+                 D: float = 0.01, R: float = 1) -> torch.Tensor:
     """
     Calculates the residual of the KPP-Fisher equation in 2D.
 
@@ -238,7 +238,7 @@ def loss_function(*coordinates: torch.Tensor,
 
 def exact_solution_1D(x: torch.Tensor,
                       t: torch.Tensor,
-                      D: float = 0.1,
+                      D: float = 0.01,
                       R: float = 1) -> torch.Tensor:
     """
     Calculates the exact solution of the KPP-Fisher equation in 1D.
@@ -260,9 +260,9 @@ def exact_solution_1D(x: torch.Tensor,
         The exact solution of the KPP-Fisher equation in 1D
     """
 
-    exponent = (((R/(2*D))**0.5)*(x-t*(2*R*D)**0.5))
+    exponent = ((R/(6*D))**0.5)*x-5*R*t/6
     exp = torch.exp(exponent)
-    exact_solution = 1/(1+exp)
+    exact_solution = (1+exp)**(-2)
     return exact_solution
 
 
@@ -350,7 +350,7 @@ def solve_with_fipy(dim: int) -> list:
     phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
 
     # define kpp-fisher
-    eq = TransientTerm() == DiffusionTerm(coeff=0.1) + phi*(1-phi)
+    eq = TransientTerm() == DiffusionTerm(coeff=0.01) + phi*(1-phi)
 
     # set boundary conditions
     if dim == 2:

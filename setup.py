@@ -7,7 +7,7 @@ __author__ = ['Francesco Colombo']
 __email__ = ['francesco.colombo10@studio.unibo.it']
 
 PACKAGE_NAME = 'pr_PINN'
-PACKAGE_VERSION = '0.1.0'
+PACKAGE_VERSION = '0.1.1'
 DESCRIPTION = 'Pattern Recognition exam - Physics Informed Neural Network'
 AUTHOR = 'Francesco Colombo'
 EMAIL = 'francesco.colombo10@studio.unibo.it'
