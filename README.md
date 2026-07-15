@@ -1,6 +1,6 @@
 | **Authors**  | **Project** |  **Documentation** | **Build Status** | **Code Quality** | **Coverage** |
 |:------------:|:-----------:|:------------------:|:----------------:|:----------------:|:------------:|
-| [**F. Colombo**](https://github.com/xover92) <br/> S&C26 student | **pr_PINN** | [![pr_PINN Docs CI](https://github.com/xover92/pr_PINN/actions/workflows/docs.yml/badge.svg)](https://github.com/xover92/pr_PINN/actions/workflows/docs.yml) | [![pr_PINN CI](https://github.com/xover92/pr_PINN/actions/workflows/python.yml/badge.svg)](https://github.com/xover92/pr_PINN/actions/workflows/python.yml) | [![Codacy Badge](https://app.codacy.com/project/badge/Grade/7e8cda9deeb5429fabf8a895a020b16c)](https://app.codacy.com/gh/xover92/pr_PINN/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) | **TODO** |
+| [**F. Colombo**](https://github.com/xover92) <br/> S&C26 student | **pr_PINN** | [![pr_PINN Docs CI](https://github.com/xover92/pr_PINN/actions/workflows/docs.yml/badge.svg)](https://github.com/xover92/pr_PINN/actions/workflows/docs.yml) | [![pr_PINN CI](https://github.com/xover92/pr_PINN/actions/workflows/python.yml/badge.svg)](https://github.com/xover92/pr_PINN/actions/workflows/python.yml) | [![Codacy Badge](https://app.codacy.com/project/badge/Grade/7e8cda9deeb5429fabf8a895a020b16c)](https://app.codacy.com/gh/xover92/pr_PINN/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) | [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/7e8cda9deeb5429fabf8a895a020b16c)](https://app.codacy.com/gh/xover92/pr_PINN/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage) |
 
 [![GitHub pull-requests](https://img.shields.io/github/issues-pr/xover92/pr_PINN.svg?style=plastic)](https://github.com/xover92/pr_PINN/pulls)
 [![GitHub issues](https://img.shields.io/github/issues/xover92/pr_PINN.svg?style=plastic)](https://github.com/xover92/pr_PINN/issues)
@@ -36,7 +36,7 @@ This is a project developed for the Pattern recognition and Software&Computing c
 
 ## Overview
 
-This project, developed for the courses of Pattern Recognition and Software&computing for applied physics, consists of a PINN that solves the Fisher-KPP equation in 1D (2D and 3D coming soon). The program is developed with user-friendliness in mind, and as such runs on gradio, which allows it to have a simple GUI.
+This project, developed for the courses of Pattern Recognition and Software&computing for applied physics, consists of a PINN that solves the Fisher-KPP equation in 1D, 2D and 3D. The program is developed with user-friendliness in mind, and as such runs on gradio, which allows it to have a simple GUI.
 
 ## Prerequisites
 
@@ -91,7 +91,7 @@ No contribution is allowed, since this is a project meant for university.
 
 ## References
 
-<blockquote>1- Aberqui et al, "Solving the Fisher nonlinear differential equations via Physics-Informed Neural Networks: A Comprehensive Retraining Study and Comparative Analysis with the Finite Difference Method", Numerical Analysis, 2026, https://arxiv.org/abs/2601.11406 </blockquote>
+<blockquote>1- Ablowitz, M.J., Zeppetella, A. Explicit solutions of Fisher's equation for a special wave speed. Bltn Mathcal Biology 41, 835–840 (1979). https://doi.org/10.1007/BF02462380 </blockquote>
 
 ## Authors
 
