@@ -4,8 +4,11 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from scipy.stats import qmc
 import numpy as np
-from fipy import CellVariable, Grid2D, Grid3D, TransientTerm, DiffusionTerm
+from fipy import CellVariable, Grid1D, Grid2D
+from fipy import Grid3D, TransientTerm, DiffusionTerm
 import matplotlib.cm as cm
+from fipy import Variable
+import fipy.tools.numerix as fpn
 
 
 class PINN(nn.Module):
@@ -321,13 +324,13 @@ def training_loop(n_epochs: int, n_neurons: int,
 
 def solve_with_fipy(dim: int) -> list:
     """
-    Solves the equation with fipy for 2d and 3d problems with
+    Solves the equation with fipy with
     dirichlet boundary conditions.
 
     Parameters
     ----------
     dim:int
-    The number of spatial dimensions taken into consideration (1<dim<4)
+    The number of spatial dimensions taken into consideration (0<dim<4)
 
     Returns
     -------
@@ -342,17 +345,29 @@ def solve_with_fipy(dim: int) -> list:
     dy = dx
     dz = dx
 
+    if dim == 1:
+        mesh = Grid1D(dx=dx, nx=nx)
+        time = Variable(value=0.0)
+        x_centers = mesh.cellCenters[0]
+        expected_value = (1+fpn.exp(x_centers*(0.06**(-0.5))))**(-2)
+        phi = CellVariable(name='solution variable',
+                           mesh=mesh, value=expected_value)
     if dim == 2:
         mesh = Grid2D(dx=dx, dy=dy, nx=nx, ny=ny)
+        phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
     if dim == 3:
         mesh = Grid3D(dx=dx, dy=dy, dz=dz, nx=nx, ny=ny, nz=nz)
-
-    phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
+        phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
 
     # define kpp-fisher
     eq = TransientTerm() == DiffusionTerm(coeff=0.01) + phi*(1-phi)
 
     # set boundary conditions
+    if dim == 1:
+        exp_value_0 = (1+fpn.exp(-5*time/6))**(-2)
+        exp_value_1 = (1+fpn.exp(0.06**(-0.5)-5*time/6))**(-2)
+        phi.constrain(exp_value_0, where=mesh.facesLeft)
+        phi.constrain(exp_value_1, where=mesh.facesRight)
     if dim == 2:
         phi.constrain(0.0, where=mesh.facesLeft | mesh.facesBottom)
         phi.constrain(1.0, where=mesh.facesRight | mesh.facesTop)
@@ -368,9 +383,12 @@ def solve_with_fipy(dim: int) -> list:
     history = []
     t = 0
     for step in range(steps):
+        time.setValue(t)
         eq.solve(var=phi,
                  dt=0.05)
         t += 0.05
+        if dim == 1:
+            history.append((np.array(phi.value).reshape((nx)), t))
         if dim == 2:
             history.append((np.array(phi.value).reshape((nx, ny)), t))
         if dim == 3:
@@ -411,6 +429,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
     model, loss_list = training_loop(n_epocs, n_neurons, n_points, dim)
     if dim != 1:
         history = solve_with_fipy(dim)
+    else:
+        history = solve_with_fipy(dim)
 
     # initializing the testing points
     x_test = torch.linspace(0, 1, 20).view(-1, 1)
@@ -424,7 +444,7 @@ def generate_plot(n_epocs: int, n_neurons: int,
     #  to a different space)
     if dim == 1:
         x_test, t_test = torch.meshgrid(
-            x_test.squeeze(), t_test.squeeze(), indexing='xy')
+            x_test.squeeze(), t_test.squeeze(), indexing='ij')
         x_test = x_test.reshape(-1, 1)
         t_test = t_test.reshape(-1, 1)
 
@@ -480,12 +500,17 @@ def generate_plot(n_epocs: int, n_neurons: int,
     epochs = [item[1] for item in loss_list]
 
     if dim == 1:
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 4))
+        fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(16, 5))
 
         x_test = x_test.numpy().reshape(20, 20)
         t_test = t_test.numpy().reshape(20, 20)
         u_pred = u_pred.reshape(20, 20)
         u_exact = u_exact.reshape(20, 20)
+
+        fipy_matrices = [item[0] if isinstance(
+            item, (tuple, list)) else item for item in history]
+        u_fipy = np.stack(fipy_matrices, axis=-1)
+        u_fipy = u_fipy.reshape(20, 20)
 
         # contour plots
         c1 = ax1.contourf(x_test, t_test, u_pred, levels=250, cmap='jet')
@@ -494,13 +519,16 @@ def generate_plot(n_epocs: int, n_neurons: int,
         c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
         ax2.set_title('Exact')
         fig.colorbar(c2, ax=ax2)
+        c3 = ax3.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
+        ax3.set_title('fipy')
+        fig.colorbar(c3, ax=ax3)
 
         # loss plot
-        ax3.plot(epochs, losses, label="loss")
-        ax3.set_yscale('log')
-        ax3.set_xlabel('epoch')
-        ax3.set_ylabel('loss')
-        ax3.grid(True)
+        ax4.plot(epochs, losses, label="loss")
+        ax4.set_yscale('log')
+        ax4.set_xlabel('epoch')
+        ax4.set_ylabel('loss')
+        ax4.grid(True)
 
         plt.tight_layout()
 
