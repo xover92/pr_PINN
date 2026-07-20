@@ -7,8 +7,6 @@ import numpy as np
 from fipy import CellVariable, Grid1D, Grid2D
 from fipy import Grid3D, TransientTerm, DiffusionTerm
 import matplotlib.cm as cm
-from fipy import Variable
-import fipy.tools.numerix as fpn
 
 
 class PINN(nn.Module):
@@ -86,7 +84,7 @@ def lhs_sample_generator(n_points: int,
         A tuple of tensors of size dim
     """
 
-    sampler = qmc.LatinHypercube(d=dim)
+    sampler = qmc.LatinHypercube(d=dim, seed=42)
     lhs_samples = sampler.random(n_points)
 
     lhs_samples = torch.Tensor(lhs_samples)
@@ -100,7 +98,8 @@ def pde_residual(*coordinates: torch.Tensor,
                  t: torch.Tensor, model: nn.Module,
                  D: float = 0.01, R: float = 1) -> torch.Tensor:
     """
-    Calculates the residual of the KPP-Fisher equation in 2D.
+    Calculates the residual of the KPP-Fisher equation,
+    inferring the dimension by the size of coordinates.
 
     Parameters
     ----------
@@ -142,9 +141,14 @@ def pde_residual(*coordinates: torch.Tensor,
     return residual
 
 
-def loss_function(*coordinates: torch.Tensor,
+def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
                   t: torch.Tensor,
-                  model: nn.Module) -> float:
+                  model: nn.Module, value_x0: float = 0.0,
+                  value_x1: float = 0.0,
+                  value_y0: float = 0.0, value_y1: float = 0.0,
+                  value_z0: float = 0.0,
+                  value_z1: float = 0.0,
+                  value_t0: float = 0.0) -> float:
     """
     Computes the loss function as the sum of the initial conditions loss,
     boundary conditions loss and the residual loss.
@@ -153,6 +157,10 @@ def loss_function(*coordinates: torch.Tensor,
     ----------
     *coordinates:torch.Tensor
         The spatial coordinates (0<dim<4).
+    mode: str = "dirichlet"
+        The mode, between dirichlet or exact.
+        dirichlet means to use dirichlet boundary conditions,
+        exact to use the exact solution (useful for testing).
     t:torch.Tensor
         The temporal coordinates
     model:nn.Module
@@ -179,29 +187,37 @@ def loss_function(*coordinates: torch.Tensor,
     # initial condition loss
     u_pr = model(*coordinates, t=torch.zeros_like(t))
     if dim == 1:
-        u_ex = exact_solution_1D(x, torch.zeros_like(x))
+        if mode == 'exact':
+            u_ex = exact_solution_1D(x, torch.zeros_like(x))
+        else:
+            u_ex = torch.full_like(t, value_t0)
     else:
-        u_ex = torch.zeros_like(t)
+        u_ex = torch.full_like(t, value_t0)
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
     # boundary conditions loss
     if dim == 1:
         u_0_pr = model(torch.zeros_like(t), t=t)
-        u_0_ex = exact_solution_1D(torch.zeros_like(t), t=t)
         u_1_pr = model(torch.full_like(t, 1), t=t)
-        u_1_ex = exact_solution_1D(torch.full_like(t, 1), t=t)
+        if mode == 'exact':
+            u_0_ex = exact_solution_1D(torch.zeros_like(t), t=t)
+            u_1_ex = exact_solution_1D(torch.full_like(t, 1), t=t)
+        else:
+            u_0_ex = torch.full_like(t, value_x0)
+            u_1_ex = torch.full_like(t, value_x1)
+
         loss_bc = torch.mean((u_0_pr-u_0_ex)**2)+torch.mean((u_1_pr-u_1_ex)**2)
 
     if dim == 2:
         u_0_pr_0y = model(torch.zeros_like(y), y, t=t)
-        u_0_ex_0y = torch.zeros_like(y)
+        u_0_ex_0y = torch.full_like(y, value_x0)
         u_0_pr_x0 = model(x, torch.zeros_like(x), t=t)
-        u_0_ex_x0 = torch.zeros_like(t)
+        u_0_ex_x0 = torch.full_like(t, value_y0)
 
         u_1_pr_1y = model(x, torch.full_like(x, 1), t=t)
-        u_1_ex_1y = torch.full_like(y, 1)
+        u_1_ex_1y = torch.full_like(y, value_x1)
         u_1_pr_x1 = model(torch.full_like(y, 1), y, t=t)
-        u_1_ex_x1 = torch.full_like(y, 1)
+        u_1_ex_x1 = torch.full_like(y, value_y1)
         loss_bc = torch.mean((u_0_pr_0y-u_0_ex_0y)**2) + \
             torch.mean((u_1_pr_1y-u_1_ex_1y)**2) + \
             torch.mean((u_0_pr_x0-u_0_ex_x0)**2) + \
@@ -210,19 +226,19 @@ def loss_function(*coordinates: torch.Tensor,
     if dim == 3:
         u_0_pr_0yz = model(torch.zeros_like(t), y,
                            z, t=t)
-        u_0_ex_0yz = torch.zeros_like(t)
+        u_0_ex_0yz = torch.full_like(t, value_x0)
         u_0_pr_x0z = model(x, torch.zeros_like(t),
                            z, t=t)
-        u_0_ex_x0z = torch.zeros_like(t)
+        u_0_ex_x0z = torch.full_like(t, value_y0)
         u_0_pr_xy0 = model(x, y, torch.zeros_like(t),
                            t=t)
-        u_0_ex_xy0 = torch.zeros_like(t)
+        u_0_ex_xy0 = torch.full_like(t, value_z0)
         u_1_pr_1yz = model(torch.full_like(t, 1), y, z, t=t)
-        u_1_ex_1yz = torch.full_like(t, 1)
+        u_1_ex_1yz = torch.full_like(t, value_x1)
         u_1_pr_x1z = model(x, torch.full_like(t, 1), z, t=t)
-        u_1_ex_x1z = torch.full_like(t, 1)
+        u_1_ex_x1z = torch.full_like(t, value_y1)
         u_1_pr_xy1 = model(x, y, torch.full_like(t, 1), t=t)
-        u_1_ex_xy1 = torch.full_like(t, 1)
+        u_1_ex_xy1 = torch.full_like(t, value_z1)
         loss_bc = torch.mean((u_0_pr_0yz-u_0_ex_0yz)**2) + \
             torch.mean((u_0_pr_xy0-u_0_ex_xy0)**2) + \
             torch.mean((u_0_pr_x0z-u_0_ex_x0z)**2) + \
@@ -244,7 +260,7 @@ def exact_solution_1D(x: torch.Tensor,
                       D: float = 0.01,
                       R: float = 1) -> torch.Tensor:
     """
-    Calculates the exact solution of the KPP-Fisher equation in 1D.
+    Calculates the exact solution of the KPP-Fisher equation.
 
     Parameters
     ----------
@@ -270,9 +286,13 @@ def exact_solution_1D(x: torch.Tensor,
 
 
 def training_loop(n_epochs: int, n_neurons: int,
-                  n_points: int, dim: int) -> tuple[nn.Module, list]:
+                  n_points: int, dim: int,
+                  value_x0: float, value_x1: float,
+                  value_y0: float, value_y1: float, value_z0: float,
+                  value_z1: float,
+                  value_t0: float) -> tuple[nn.Module, list]:
     """
-    Runs n_epochs loops to train the model as defined in pr_PINN_2d
+    Runs n_epochs loops to train the model.
 
     Parameters
     ----------
@@ -282,6 +302,22 @@ def training_loop(n_epochs: int, n_neurons: int,
     The numer of neurons per layer.
     n_points:int
     The number of points for LHS sampling.
+    dim:int
+    The spatial dimensions.
+    value_x0: float
+    The dirichlet condition for x=0
+    value_x1: float
+    The dirichlet condition for x=1
+    value_y0: float
+    The dirichlet condition for y=0
+    value_y1: float
+    The dirichlet condition for y=1
+    value_z0: float
+    The dirichlet condition for z=0
+    value_z1: float
+    The dirichlet condition for z=1
+    value_t0: float
+    The initial condition
 
     Returns
     -------
@@ -308,7 +344,11 @@ def training_loop(n_epochs: int, n_neurons: int,
     for epoch in range(n_epochs):
         model.train()
 
-        loss = loss_function(*spatial_coords, t=t, model=model)
+        loss = loss_function(*spatial_coords, t=t, model=model,
+                             value_x0=value_x0, value_x1=value_x1,
+                             value_y0=value_y0, value_y1=value_y1,
+                             value_z0=value_z0, value_z1=value_z1,
+                             value_t0=value_t0)
 
         # collect loss for loss evolution
         if epoch % 10 == 0:
@@ -322,7 +362,10 @@ def training_loop(n_epochs: int, n_neurons: int,
     return model, loss_list
 
 
-def solve_with_fipy(dim: int) -> list:
+def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
+                    value_y0: float, value_y1: float, value_z0: float,
+                    value_z1: float,
+                    value_t0: float) -> list:
     """
     Solves the equation with fipy with
     dirichlet boundary conditions.
@@ -331,6 +374,20 @@ def solve_with_fipy(dim: int) -> list:
     ----------
     dim:int
     The number of spatial dimensions taken into consideration (0<dim<4)
+    value_x0: float
+    The dirichlet condition for x=0
+    value_x1: float
+    The dirichlet condition for x=1
+    value_y0: float
+    The dirichlet condition for y=0
+    value_y1: float
+    The dirichlet condition for y=1
+    value_z0: float
+    The dirichlet condition for z=0
+    value_z1: float
+    The dirichlet condition for z=1
+    value_t0: float
+    The initial condition
 
     Returns
     -------
@@ -347,45 +404,57 @@ def solve_with_fipy(dim: int) -> list:
 
     if dim == 1:
         mesh = Grid1D(dx=dx, nx=nx)
-        time = Variable(value=0.0)
-        x_centers = mesh.cellCenters[0]
-        expected_value = (1+fpn.exp(x_centers*(0.06**(-0.5))))**(-2)
+        # time = Variable(value=0.0)
+        # x_centers = mesh.cellCenters[0]
+        # expected_value = (1+fpn.exp(x_centers*(0.06**(-0.5))))**(-2)
         phi = CellVariable(name='solution variable',
-                           mesh=mesh, value=expected_value)
+                           mesh=mesh, value=value_t0)
     if dim == 2:
         mesh = Grid2D(dx=dx, dy=dy, nx=nx, ny=ny)
-        phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
+        phi = CellVariable(name='solution variable', mesh=mesh, value=value_t0)
     if dim == 3:
         mesh = Grid3D(dx=dx, dy=dy, dz=dz, nx=nx, ny=ny, nz=nz)
-        phi = CellVariable(name='solution variable', mesh=mesh, value=0.0)
+        phi = CellVariable(name='solution variable', mesh=mesh, value=value_t0)
 
     # define kpp-fisher
     eq = TransientTerm() == DiffusionTerm(coeff=0.01) + phi*(1-phi)
 
     # set boundary conditions
     if dim == 1:
-        exp_value_0 = (1+fpn.exp(-5*time/6))**(-2)
-        exp_value_1 = (1+fpn.exp(0.06**(-0.5)-5*time/6))**(-2)
+        exp_value_0 = value_x0  # (1+fpn.exp(-5*time/6))**(-2)
+        exp_value_1 = value_x1  # (1+fpn.exp(0.06**(-0.5)-5*time/6))**(-2)
         phi.constrain(exp_value_0, where=mesh.facesLeft)
         phi.constrain(exp_value_1, where=mesh.facesRight)
     if dim == 2:
-        phi.constrain(0.0, where=mesh.facesLeft | mesh.facesBottom)
-        phi.constrain(1.0, where=mesh.facesRight | mesh.facesTop)
+        phi.constrain(value_x0, where=mesh.facesLeft)
+        phi.constrain(value_y0, where=mesh.facesBottom)
+        phi.constrain(value_x1, where=mesh.facesRight)
+        phi.constrain(value_y1, where=mesh.facesTop)
 
     if dim == 3:
-        phi.constrain(0.0, where=mesh.facesLeft |
-                      mesh.facesBottom | mesh.facesFront)
-        phi.constrain(1.0, where=mesh.facesRight |
-                      mesh.facesTop | mesh.facesBack)
+        phi.constrain(value_x0, where=mesh.facesLeft)
+        phi.constrain(value_y0, where=mesh.facesBottom)
+        phi.constrain(value_x1, where=mesh.facesRight)
+        phi.constrain(value_y1, where=mesh.facesTop)
+        phi.constrain(value_z0, where=mesh.facesFront)
+        phi.constrain(value_z1, where=mesh.facesBack)
 
     # record solutions for various time steps
-    steps = 20
+    steps = 19
     history = []
-    t = 0
+    t = 0.0
+    if dim == 1:
+        history.append((np.array(phi.value).reshape((nx)), t))
+    if dim == 2:
+        history.append((np.array(phi.value).reshape((nx, ny)), t))
+    if dim == 3:
+        history.append((np.array(phi.value).reshape((nx, ny, nz)), t))
+
+    dt = 1.0/19
     for step in range(steps):
-        time.setValue(t)
+        # time.setValue(t)
         eq.solve(var=phi,
-                 dt=0.05)
+                 dt=dt)
         t += 0.05
         if dim == 1:
             history.append((np.array(phi.value).reshape((nx)), t))
@@ -398,7 +467,9 @@ def solve_with_fipy(dim: int) -> list:
 
 
 def generate_plot(n_epocs: int, n_neurons: int,
-                  n_points: int, dim: int) -> tuple[Figure, str]:
+                  n_points: int, dim: int, value_x0,
+                  value_x1, value_y0, value_y1,
+                  value_z0, value_z1, value_t0) -> tuple[Figure, str]:
     """
     Runs the loop and then generates a plot
     of the loss evolution related to the epochs,
@@ -417,6 +488,22 @@ def generate_plot(n_epocs: int, n_neurons: int,
     The numer of neurons per layer.
     n_points:int
     The number of points for LHS sampling.
+    dim:int
+    The number of spatil dimensions.
+    value_x0: float
+    The dirichlet condition for x=0
+    value_x1: float
+    The dirichlet condition for x=1
+    value_y0: float
+    The dirichlet condition for y=0
+    value_y1: float
+    The dirichlet condition for y=1
+    value_z0: float
+    The dirichlet condition for z=0
+    value_z1: float
+    The dirichlet condition for z=1
+    value_t0: float
+    The initial condition
 
     Returns
     -------
@@ -426,11 +513,26 @@ def generate_plot(n_epocs: int, n_neurons: int,
     Returns a string indicationg the l2_loss.
     """
 
-    model, loss_list = training_loop(n_epocs, n_neurons, n_points, dim)
+    value_x0 = float(value_x0)
+    value_x1 = float(value_x1)
+    value_y0 = float(value_y0)
+    value_y1 = float(value_y1)
+    value_z0 = float(value_z0)
+    value_z1 = float(value_z1)
+    value_t0 = float(value_t0)
+
+    model, loss_list = training_loop(
+        n_epocs, n_neurons, n_points, dim, value_x0,
+        value_x1, value_y0, value_y1,
+        value_z0, value_z1, value_t0)
     if dim != 1:
-        history = solve_with_fipy(dim)
+        history = solve_with_fipy(dim, value_x0,
+                                  value_x1, value_y0, value_y1,
+                                  value_z0, value_z1, value_t0)
     else:
-        history = solve_with_fipy(dim)
+        history = solve_with_fipy(dim, value_x0,
+                                  value_x1, value_y0, value_y1,
+                                  value_z0, value_z1, value_t0)
 
     # initializing the testing points
     x_test = torch.linspace(0, 1, 20).view(-1, 1)
@@ -500,7 +602,7 @@ def generate_plot(n_epocs: int, n_neurons: int,
     epochs = [item[1] for item in loss_list]
 
     if dim == 1:
-        fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(16, 5))
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 5))
 
         x_test = x_test.numpy().reshape(20, 20)
         t_test = t_test.numpy().reshape(20, 20)
@@ -510,25 +612,26 @@ def generate_plot(n_epocs: int, n_neurons: int,
         fipy_matrices = [item[0] if isinstance(
             item, (tuple, list)) else item for item in history]
         u_fipy = np.stack(fipy_matrices, axis=-1)
+        u_exact_tensor = torch.Tensor(u_fipy).reshape(-1, 1)
         u_fipy = u_fipy.reshape(20, 20)
 
         # contour plots
         c1 = ax1.contourf(x_test, t_test, u_pred, levels=250, cmap='jet')
         ax1.set_title('Prediction (PINN)')
         fig.colorbar(c1, ax=ax1)
-        c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
-        ax2.set_title('Exact')
+        # c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
+        # ax2.set_title('Exact')
+        # fig.colorbar(c2, ax=ax2)
+        c2 = ax2.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
+        ax2.set_title('fipy')
         fig.colorbar(c2, ax=ax2)
-        c3 = ax3.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
-        ax3.set_title('fipy')
-        fig.colorbar(c3, ax=ax3)
 
         # loss plot
-        ax4.plot(epochs, losses, label="loss")
-        ax4.set_yscale('log')
-        ax4.set_xlabel('epoch')
-        ax4.set_ylabel('loss')
-        ax4.grid(True)
+        ax3.plot(epochs, losses, label="loss")
+        ax3.set_yscale('log')
+        ax3.set_xlabel('epoch')
+        ax3.set_ylabel('loss')
+        ax3.grid(True)
 
         plt.tight_layout()
 

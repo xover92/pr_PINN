@@ -149,6 +149,6 @@ def test_loss_1d(x_val, t_val, oracle):
     t = torch.tensor([[t_val]])
     x.requires_grad = True
     t.requires_grad = True
-    loss = prp.loss_function(x, t=t, model=oracle)
+    loss = prp.loss_function(x, mode='exact', t=t, model=oracle)
     print(f"Loss at ({x_val}, {t_val}): {loss.item()}")
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)
