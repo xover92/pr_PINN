@@ -141,6 +141,40 @@ def pde_residual(*coordinates: torch.Tensor,
     return residual
 
 
+def neumann_condition(*coordinates: torch.Tensor,
+                      t: torch.Tensor, model: nn.Module) -> float:
+    """
+    Computes the Neumann condition loss.
+
+    Parameters
+    ----------
+    *coordinates: torch.Tensor
+    The spatial coordinates.
+    t: torch.Tensor
+    The temporal coordinates.
+    model: nn.Module
+    The PINN.
+
+    Returns
+    -------
+    loss: float
+    The Neumann condition loss.
+    """
+    loss = 0.0
+    for i, coord in enumerate(coordinates):
+        for boundary_val in (0.0, 1.0):
+            boundary_coords = list(coordinates)
+            boundary_coords[i] = torch.full_like(coord, boundary_val,
+                                                 requires_grad=True)
+
+            u_b = model(*boundary_coords, t=t)
+            du_dcoord = torch.autograd.grad(
+                u_b, boundary_coords[i], create_graph=True,
+                grad_outputs=torch.ones_like(u_b))[0]
+            loss += torch.mean(du_dcoord**2)
+    return loss
+
+
 def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
                   t: torch.Tensor,
                   model: nn.Module, value_x0: float = 0.0,
@@ -158,9 +192,7 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
     *coordinates:torch.Tensor
         The spatial coordinates (0<dim<4).
     mode: str = "dirichlet"
-        The mode, between dirichlet or exact.
-        dirichlet means to use dirichlet boundary conditions,
-        exact to use the exact solution (useful for testing).
+        The type of boundary conditions applied.
     t:torch.Tensor
         The temporal coordinates
     model:nn.Module
@@ -196,55 +228,58 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
     # boundary conditions loss
-    if dim == 1:
-        u_0_pr = model(torch.zeros_like(t), t=t)
-        u_1_pr = model(torch.full_like(t, 1), t=t)
-        if mode == 'exact':
-            u_0_ex = exact_solution_1D(torch.zeros_like(t), t=t)
-            u_1_ex = exact_solution_1D(torch.full_like(t, 1), t=t)
-        else:
-            u_0_ex = torch.full_like(t, value_x0)
-            u_1_ex = torch.full_like(t, value_x1)
+    if mode != 'dirichlet':
+        if dim == 1:
+            u_0_pr = model(torch.zeros_like(t), t=t)
+            u_1_pr = model(torch.full_like(t, 1), t=t)
+            if mode == 'exact':
+                u_0_ex = exact_solution_1D(torch.zeros_like(t), t=t)
+                u_1_ex = exact_solution_1D(torch.full_like(t, 1), t=t)
+            else:
+                u_0_ex = torch.full_like(t, value_x0)
+                u_1_ex = torch.full_like(t, value_x1)
+            loss_bc = torch.mean((u_0_pr-u_0_ex)**2) + \
+                torch.mean((u_1_pr-u_1_ex)**2)
 
-        loss_bc = torch.mean((u_0_pr-u_0_ex)**2)+torch.mean((u_1_pr-u_1_ex)**2)
+        if dim == 2:
+            u_pr_0y = model(torch.zeros_like(y), y, t=t)
+            u_ex_0y = torch.full_like(y, value_x0)
+            u_pr_x0 = model(x, torch.zeros_like(x), t=t)
+            u_ex_x0 = torch.full_like(x, value_y0)
 
-    if dim == 2:
-        u_0_pr_0y = model(torch.zeros_like(y), y, t=t)
-        u_0_ex_0y = torch.full_like(y, value_x0)
-        u_0_pr_x0 = model(x, torch.zeros_like(x), t=t)
-        u_0_ex_x0 = torch.full_like(t, value_y0)
+            u_pr_1y = model(torch.full_like(y, 1), y, t=t)
+            u_ex_1y = torch.full_like(y, value_x1)
+            u_pr_x1 = model(x, torch.full_like(x, 1), t=t)
+            u_ex_x1 = torch.full_like(x, value_y1)
+            loss_bc = torch.mean((u_pr_0y-u_ex_0y)**2) + \
+                torch.mean((u_pr_1y-u_ex_1y)**2) + \
+                torch.mean((u_pr_x0-u_ex_x0)**2) + \
+                torch.mean((u_pr_x1-u_ex_x1)**2)
 
-        u_1_pr_1y = model(x, torch.full_like(x, 1), t=t)
-        u_1_ex_1y = torch.full_like(y, value_x1)
-        u_1_pr_x1 = model(torch.full_like(y, 1), y, t=t)
-        u_1_ex_x1 = torch.full_like(y, value_y1)
-        loss_bc = torch.mean((u_0_pr_0y-u_0_ex_0y)**2) + \
-            torch.mean((u_1_pr_1y-u_1_ex_1y)**2) + \
-            torch.mean((u_0_pr_x0-u_0_ex_x0)**2) + \
-            torch.mean((u_1_pr_x1-u_1_ex_x1)**2)
-
-    if dim == 3:
-        u_0_pr_0yz = model(torch.zeros_like(t), y,
-                           z, t=t)
-        u_0_ex_0yz = torch.full_like(t, value_x0)
-        u_0_pr_x0z = model(x, torch.zeros_like(t),
-                           z, t=t)
-        u_0_ex_x0z = torch.full_like(t, value_y0)
-        u_0_pr_xy0 = model(x, y, torch.zeros_like(t),
-                           t=t)
-        u_0_ex_xy0 = torch.full_like(t, value_z0)
-        u_1_pr_1yz = model(torch.full_like(t, 1), y, z, t=t)
-        u_1_ex_1yz = torch.full_like(t, value_x1)
-        u_1_pr_x1z = model(x, torch.full_like(t, 1), z, t=t)
-        u_1_ex_x1z = torch.full_like(t, value_y1)
-        u_1_pr_xy1 = model(x, y, torch.full_like(t, 1), t=t)
-        u_1_ex_xy1 = torch.full_like(t, value_z1)
-        loss_bc = torch.mean((u_0_pr_0yz-u_0_ex_0yz)**2) + \
-            torch.mean((u_0_pr_xy0-u_0_ex_xy0)**2) + \
-            torch.mean((u_0_pr_x0z-u_0_ex_x0z)**2) + \
-            torch.mean((u_1_pr_1yz-u_1_ex_1yz)**2) + \
-            torch.mean((u_1_pr_x1z-u_1_ex_x1z)**2) + \
-            torch.mean((u_1_pr_xy1-u_1_ex_xy1)**2)
+        if dim == 3:
+            u_pr_0yz = model(torch.zeros_like(y), y,
+                             z, t=t)
+            u_ex_0yz = torch.full_like(y, value_x0)
+            u_pr_x0z = model(x, torch.zeros_like(x),
+                             z, t=t)
+            u_ex_x0z = torch.full_like(x, value_y0)
+            u_pr_xy0 = model(x, y, torch.zeros_like(x),
+                             t=t)
+            u_ex_xy0 = torch.full_like(x, value_z0)
+            u_pr_1yz = model(torch.full_like(y, 1), y, z, t=t)
+            u_ex_1yz = torch.full_like(y, value_x1)
+            u_pr_x1z = model(x, torch.full_like(y, 1), z, t=t)
+            u_ex_x1z = torch.full_like(y, value_y1)
+            u_pr_xy1 = model(x, y, torch.full_like(x, 1), t=t)
+            u_ex_xy1 = torch.full_like(x, value_z1)
+            loss_bc = torch.mean((u_pr_0yz-u_ex_0yz)**2) + \
+                torch.mean((u_pr_xy0-u_ex_xy0)**2) + \
+                torch.mean((u_pr_x0z-u_ex_x0z)**2) + \
+                torch.mean((u_pr_1yz-u_ex_1yz)**2) + \
+                torch.mean((u_pr_x1z-u_ex_x1z)**2) + \
+                torch.mean((u_pr_xy1-u_ex_xy1)**2)
+    elif mode == 'neumann':
+        loss_bc = neumann_condition(*coordinates, t=t, model=model)
 
     # residual loss
     loss_pde = torch.mean(pde_residual(*coordinates, t=t, model=model)**2)
@@ -286,7 +321,7 @@ def exact_solution_1D(x: torch.Tensor,
 
 
 def training_loop(n_epochs: int, n_neurons: int,
-                  n_points: int, dim: int,
+                  n_points: int, dim: int, mode: str,
                   value_x0: float, value_x1: float,
                   value_y0: float, value_y1: float, value_z0: float,
                   value_z1: float,
@@ -304,6 +339,8 @@ def training_loop(n_epochs: int, n_neurons: int,
     The number of points for LHS sampling.
     dim:int
     The spatial dimensions.
+    mode: str
+    The type of boundary conditions.
     value_x0: float
     The dirichlet condition for x=0
     value_x1: float
@@ -344,7 +381,7 @@ def training_loop(n_epochs: int, n_neurons: int,
     for epoch in range(n_epochs):
         model.train()
 
-        loss = loss_function(*spatial_coords, t=t, model=model,
+        loss = loss_function(*spatial_coords, t=t, model=model, mode=mode,
                              value_x0=value_x0, value_x1=value_x1,
                              value_y0=value_y0, value_y1=value_y1,
                              value_z0=value_z0, value_z1=value_z1,
@@ -362,7 +399,7 @@ def training_loop(n_epochs: int, n_neurons: int,
     return model, loss_list
 
 
-def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
+def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
                     value_y0: float, value_y1: float, value_z0: float,
                     value_z1: float,
                     value_t0: float) -> list:
@@ -374,6 +411,8 @@ def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
     ----------
     dim:int
     The number of spatial dimensions taken into consideration (0<dim<4)
+    mode: str
+    The type of boundary conditions applied.
     value_x0: float
     The dirichlet condition for x=0
     value_x1: float
@@ -420,24 +459,42 @@ def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
     eq = TransientTerm() == DiffusionTerm(coeff=0.01) + phi*(1-phi)
 
     # set boundary conditions
-    if dim == 1:
-        exp_value_0 = value_x0  # (1+fpn.exp(-5*time/6))**(-2)
-        exp_value_1 = value_x1  # (1+fpn.exp(0.06**(-0.5)-5*time/6))**(-2)
-        phi.constrain(exp_value_0, where=mesh.facesLeft)
-        phi.constrain(exp_value_1, where=mesh.facesRight)
-    if dim == 2:
-        phi.constrain(value_x0, where=mesh.facesLeft)
-        phi.constrain(value_y0, where=mesh.facesBottom)
-        phi.constrain(value_x1, where=mesh.facesRight)
-        phi.constrain(value_y1, where=mesh.facesTop)
+    if mode == 'dirichlet':
+        if dim == 1:
+            exp_value_0 = value_x0  # (1+fpn.exp(-5*time/6))**(-2)
+            exp_value_1 = value_x1  # (1+fpn.exp(0.06**(-0.5)-5*time/6))**(-2)
+            phi.constrain(exp_value_0, where=mesh.facesLeft)
+            phi.constrain(exp_value_1, where=mesh.facesRight)
+        if dim == 2:
+            phi.constrain(value_x0, where=mesh.facesLeft)
+            phi.constrain(value_y0, where=mesh.facesBottom)
+            phi.constrain(value_x1, where=mesh.facesRight)
+            phi.constrain(value_y1, where=mesh.facesTop)
 
-    if dim == 3:
-        phi.constrain(value_x0, where=mesh.facesLeft)
-        phi.constrain(value_y0, where=mesh.facesBottom)
-        phi.constrain(value_x1, where=mesh.facesRight)
-        phi.constrain(value_y1, where=mesh.facesTop)
-        phi.constrain(value_z0, where=mesh.facesFront)
-        phi.constrain(value_z1, where=mesh.facesBack)
+        if dim == 3:
+            phi.constrain(value_x0, where=mesh.facesLeft)
+            phi.constrain(value_y0, where=mesh.facesBottom)
+            phi.constrain(value_x1, where=mesh.facesRight)
+            phi.constrain(value_y1, where=mesh.facesTop)
+            phi.constrain(value_z0, where=mesh.facesFront)
+            phi.constrain(value_z1, where=mesh.facesBack)
+    elif mode == 'neumann':
+        if dim == 1:
+            phi.faceGrad.constrain(0.0, where=mesh.facesLeft)
+            phi.faceGrad.constrain(0.0, where=mesh.facesRight)
+        if dim == 2:
+            phi.faceGrad.constrain(0.0, where=mesh.facesLeft)
+            phi.faceGrad.constrain(0.0, where=mesh.facesBottom)
+            phi.faceGrad.constrain(0.0, where=mesh.facesRight)
+            phi.faceGrad.constrain(0.0, where=mesh.facesTop)
+
+        if dim == 3:
+            phi.faceGrad.constrain(0.0, where=mesh.facesLeft)
+            phi.faceGrad.constrain(0.0, where=mesh.facesBottom)
+            phi.faceGrad.constrain(0.0, where=mesh.facesRight)
+            phi.faceGrad.constrain(0.0, where=mesh.facesTop)
+            phi.faceGrad.constrain(0.0, where=mesh.facesFront)
+            phi.faceGrad.constrain(0.0, where=mesh.facesBack)
 
     # record solutions for various time steps
     steps = 19
@@ -450,7 +507,7 @@ def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
     if dim == 3:
         history.append((np.array(phi.value).reshape((nx, ny, nz)), t))
 
-    dt = 1.0/19
+    dt = 1 / steps
     for step in range(steps):
         # time.setValue(t)
         eq.solve(var=phi,
@@ -467,7 +524,7 @@ def solve_with_fipy(dim: int, value_x0: float, value_x1: float,
 
 
 def generate_plot(n_epocs: int, n_neurons: int,
-                  n_points: int, dim: int, value_x0,
+                  n_points: int, dim: int, mode: str, value_x0,
                   value_x1, value_y0, value_y1,
                   value_z0, value_z1, value_t0) -> tuple[Figure, str]:
     """
@@ -490,6 +547,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
     The number of points for LHS sampling.
     dim:int
     The number of spatil dimensions.
+    mode: str
+    The type of boundary conditions applied.
     value_x0: float
     The dirichlet condition for x=0
     value_x1: float
@@ -522,22 +581,22 @@ def generate_plot(n_epocs: int, n_neurons: int,
     value_t0 = float(value_t0)
 
     model, loss_list = training_loop(
-        n_epocs, n_neurons, n_points, dim, value_x0,
+        n_epocs, n_neurons, n_points, dim, mode, value_x0,
         value_x1, value_y0, value_y1,
         value_z0, value_z1, value_t0)
     if dim != 1:
-        history = solve_with_fipy(dim, value_x0,
+        history = solve_with_fipy(dim, mode, value_x0,
                                   value_x1, value_y0, value_y1,
                                   value_z0, value_z1, value_t0)
     else:
-        history = solve_with_fipy(dim, value_x0,
+        history = solve_with_fipy(dim, mode, value_x0,
                                   value_x1, value_y0, value_y1,
                                   value_z0, value_z1, value_t0)
 
     # initializing the testing points
-    x_test = torch.linspace(0, 1, 20).view(-1, 1)
-    y_test = torch.linspace(0, 1, 20).view(-1, 1)
-    z_test = torch.linspace(0, 1, 20).view(-1, 1)
+    x_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
+    y_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
+    z_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
     t_test = torch.linspace(0, 1, 20).view(-1, 1)
 
     # runs different meshgrids and operations for differents dims
@@ -668,8 +727,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
         hole = (x_ds > 0.6) & (y_ds < 0.4) & (z_ds > 0.6)
         voxels[hole] = False
 
-        norm = plt.Normalize(u_ds.min(), u_ds.max())
-        colors = cm.viridis(norm(u_ds))
+        norm_pred = plt.Normalize(u_ds.min(), u_ds.max())
+        colors = cm.viridis(norm_pred(u_ds))
         colors[..., 3] = 1.0
 
         fipy_matrices = [item[0] if isinstance(
@@ -677,13 +736,14 @@ def generate_plot(n_epocs: int, n_neurons: int,
         u_exact = np.stack(fipy_matrices, axis=-1)
         u_exact_tensor = torch.Tensor(u_exact).reshape(-1, 1)
         u_exact_ds = u_exact[::ds, ::ds, ::ds]
+        norm_exact = plt.Normalize(u_exact_ds.min(), u_exact_ds.max())
 
         if dim == 3:
             u_exact = history[9][0]  # fixing t
             u_exact_ds = u_exact[::ds, ::ds, ::ds]
 
         # set the color scale
-        colors_exact = cm.viridis(norm(u_exact_ds))
+        colors_exact = cm.viridis(norm_exact(u_exact_ds))
         colors_exact[..., 3] = 1.0
 
         fig = plt.figure(figsize=(16, 5))
