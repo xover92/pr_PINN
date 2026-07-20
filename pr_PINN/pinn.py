@@ -228,7 +228,9 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
     # boundary conditions loss
-    if mode != 'dirichlet':
+    if mode == 'neumann':
+        loss_bc = neumann_condition(*coordinates, t=t, model=model)
+    else:
         if dim == 1:
             u_0_pr = model(torch.zeros_like(t), t=t)
             u_1_pr = model(torch.full_like(t, 1), t=t)
@@ -278,8 +280,6 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
                 torch.mean((u_pr_1yz-u_ex_1yz)**2) + \
                 torch.mean((u_pr_x1z-u_ex_x1z)**2) + \
                 torch.mean((u_pr_xy1-u_ex_xy1)**2)
-    elif mode == 'neumann':
-        loss_bc = neumann_condition(*coordinates, t=t, model=model)
 
     # residual loss
     loss_pde = torch.mean(pde_residual(*coordinates, t=t, model=model)**2)
