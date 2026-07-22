@@ -56,6 +56,3 @@ requires = [
   'setuptools>=42',
 ]
 build-backend = 'setuptools.build_meta'
-
-[tool.bandit]
-exclude_dirs = ["test"]
