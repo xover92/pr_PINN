@@ -3,6 +3,19 @@ import torch.nn as nn
 import pytest
 import pr_PINN.pinn as prp
 
+# lhs_sample_generator: TODO shape checking
+# pde_residual: tested
+# neumann_condition: tested
+# dirichlet_condition: tested
+# loss_function: tested in 1d by itself and in other dimensions
+#                by dependencies, TODO smoke test
+# exact_solution_1d: tested
+# training_loop: tested by dependencies TODO orchestation test
+# solve with fipy: not tested (depends on native funcs)
+# generate_plot: tested dependencies TODO branching test
+
+# TODO change the test points logic by using itertools
+
 
 class quadratic_model_1d(nn.Module):
     def forward(self, x, t):
@@ -150,5 +163,161 @@ def test_loss_1d(x_val, t_val, oracle):
     x.requires_grad = True
     t.requires_grad = True
     loss = prp.loss_function(x, mode='exact', t=t, model=oracle)
-    print(f"Loss at ({x_val}, {t_val}): {loss.item()}")
+    assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize("x_val, t_val", [
+    (0.0, 0.0),
+    (1.0, 0.0),
+    (0.0, 1.0),
+    (0.5, 0.5)
+])
+def test_loss_neumann(x_val, t_val, quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    t.requires_grad = True
+    loss = prp.neumann_condition(x, t=t, model=quad_dummy_model(1))
+    print(f'{loss}')
+    assert torch.allclose(loss, torch.tensor([[4.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize("x_res, y_res, t_res", [
+    (0.0, 0.0, 0.0),
+    (1.0, 0.0, 0.0),
+    (0.0, 1.0, 0.0),
+    (0.0, 0.0, 1.0),
+    (1.0, 0.0, 1.0),
+    (0.0, 1.0, 1.0),
+    (1.0, 1.0, 0.0),
+    (1.0, 1.0, 1.0),
+    (0.5, 0.5, 0.5),
+])
+def test_loss_neumann_2d(x_res,  y_res, t_res, quad_dummy_model):
+    x = torch.Tensor([[x_res]])
+    y = torch.Tensor([[y_res]])
+    t = torch.Tensor([[t_res]])
+    x.requires_grad = True
+    y.requires_grad = True
+    t.requires_grad = True
+    loss = prp.neumann_condition(x, y, t=t, model=quad_dummy_model(2))
+    print(f'{loss}')
+    assert torch.allclose(loss, torch.tensor([[8.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize("x_res, y_res, z_res, t_res", [
+    (0.0, 0.0, 0.0, 0.0),
+    (1.0, 0.0, 0.0, 0.0),
+    (0.0, 1.0, 0.0, 0.0),
+    (0.0, 0.0, 1.0, 0.0),
+    (1.0, 0.0, 1.0, 0.0),
+    (0.0, 1.0, 1.0, 0.0),
+    (1.0, 1.0, 0.0, 0.0),
+    (1.0, 1.0, 1.0, 0.0),
+    (0.0, 0.0, 0.0, 1.0),
+    (1.0, 0.0, 0.0, 1.0),
+    (0.0, 1.0, 0.0, 1.0),
+    (0.0, 0.0, 1.0, 1.0),
+    (1.0, 0.0, 1.0, 1.0),
+    (0.0, 1.0, 1.0, 1.0),
+    (1.0, 1.0, 0.0, 1.0),
+    (1.0, 1.0, 1.0, 1.0),
+    (0.5, 0.5, 0.5, 0.5),
+])
+def test_loss_neumann_3d(x_res,  y_res, z_res, t_res, quad_dummy_model):
+    x = torch.Tensor([[x_res]])
+    y = torch.Tensor([[y_res]])
+    z = torch.Tensor([[z_res]])
+    t = torch.Tensor([[t_res]])
+    x.requires_grad = True
+    y.requires_grad = True
+    z.requires_grad = True
+    t.requires_grad = True
+    loss = prp.neumann_condition(x, y, z, t=t, model=quad_dummy_model(3))
+    print(f'{loss}')
+    assert torch.allclose(loss, torch.tensor([[12.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize("x_val, t_val, exp_val_x0, exp_val_x1", [
+    (0.0, 0.0, 0.0, 1.0),
+    (1.0, 0.0, 0.0, 1.0),
+    (0.0, 1.0, 1.0, 2.0),
+    (0.5, 0.5, 0.50, 1.50)
+])
+def test_loss_dirichlet(x_val, t_val, exp_val_x0, exp_val_x1,
+                        quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    t.requires_grad = True
+    loss = prp.dirichlet_condition(
+        x, t=t, model=quad_dummy_model(1),
+        value_x0=exp_val_x0, value_x1=exp_val_x1)
+    assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "x_val, y_val, t_val, exp_val_x0, exp_val_x1, exp_val_y0, exp_val_y1", [
+        (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0),
+        (1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0),
+        (0.0, 1.0, 0.0, 1.0, 2.0, 0.0, 1.0),
+        (0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0),
+        (1.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0),
+        (0.0, 1.0, 1.0, 2.0, 3.0, 1.0, 2.0),
+        (1.0, 1.0, 0.0, 1.0, 2.0, 1.0, 2.0),
+        (1.0, 1.0, 1.0, 2.0, 3.0, 2.0, 3.0),
+        (0.5, 0.5, 0.5, 0.75, 1.75, 0.75, 1.75),
+    ])
+def test_loss_dirichlet_2d(x_val, y_val, t_val, exp_val_x0, exp_val_x1,
+                           exp_val_y0, exp_val_y1,
+                           quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    y = torch.Tensor([[y_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    y.requires_grad = True
+    t.requires_grad = True
+    loss = prp.dirichlet_condition(
+        x, y, t=t, model=quad_dummy_model(2),
+        value_x0=exp_val_x0, value_x1=exp_val_x1,
+        value_y0=exp_val_y0, value_y1=exp_val_y1)
+    assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "x_val, y_val, z_val, t_val, x0, x1, y0, y1, z0, z1", [
+        (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
+        (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0),
+        (0.0, 1.0, 0.0, 0.0, 1.0, 2.0, 0.0, 1.0, 1.0, 2.0),
+        (0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0),
+        (1.0, 0.0, 1.0, 0.0, 1.0, 2.0, 2.0, 3.0, 1.0, 2.0),
+        (0.0, 1.0, 1.0, 0.0, 2.0, 3.0, 1.0, 2.0, 1.0, 2.0),
+        (1.0, 1.0, 0.0, 0.0, 1.0, 2.0, 1.0, 2.0, 2.0, 3.0),
+        (1.0, 1.0, 1.0, 0.0, 2.0, 3.0, 2.0, 3.0, 2.0, 3.0),
+        (0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0),
+        (1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 2.0, 3.0),
+        (0.0, 1.0, 0.0, 1.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0),
+        (0.0, 0.0, 1.0, 1.0, 2.0, 3.0, 2.0, 3.0, 1.0, 2.0),
+        (1.0, 0.0, 1.0, 1.0, 2.0, 3.0, 3.0, 4.0, 2.0, 3.0),
+        (0.0, 1.0, 1.0, 1.0, 3.0, 4.0, 2.0, 3.0, 2.0, 3.0),
+        (1.0, 1.0, 0.0, 1.0, 2.0, 3.0, 2.0, 3.0, 3.0, 4.0),
+        (1.0, 1.0, 1.0, 1.0, 3.0, 4.0, 3.0, 4.0, 3.0, 4.0),
+        (0.5, 0.5, 0.5, 0.5, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0),
+    ])
+def test_loss_dirichlet_3d(x_val, y_val, z_val, t_val, x0, x1,
+                           y0, y1, z0, z1,
+                           quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    y = torch.Tensor([[y_val]])
+    z = torch.Tensor([[z_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    y.requires_grad = True
+    z.requires_grad = True
+    t.requires_grad = True
+    loss = prp.dirichlet_condition(
+        x, y, z, t=t, model=quad_dummy_model(3),
+        value_x0=x0, value_x1=x1,
+        value_y0=y0, value_y1=y1,
+        value_z0=z0, value_z1=z1)
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)
