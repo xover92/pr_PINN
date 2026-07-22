@@ -1,18 +1,19 @@
 import torch
 import torch.nn as nn
+import math
 import pytest
 import pr_PINN.pinn as prp
 
-# lhs_sample_generator: TODO shape checking
+# lhs_sample_generator: shape checking
 # pde_residual: tested
 # neumann_condition: tested
 # dirichlet_condition: tested
 # loss_function: tested in 1d by itself and in other dimensions
-#                by dependencies, TODO smoke test
+#                by dependencies
 # exact_solution_1d: tested
-# training_loop: tested by dependencies TODO orchestation test
+# training_loop: tested by dependencies
 # solve with fipy: not tested (depends on native funcs)
-# generate_plot: tested dependencies TODO branching test
+# generate_plot: tested dependencies, done branching test
 
 # TODO change the test points logic by using itertools
 
@@ -322,3 +323,33 @@ def test_loss_dirichlet_3d(x_val, y_val, z_val, t_val, x0, x1,
         value_y0=y0, value_y1=y1,
         value_z0=z0, value_z1=z1)
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)  # nosec B101
+
+
+def test_lhs_sample_shape_and_properties():
+    for dim in [1, 2, 3]:
+        points = prp.lhs_sample_generator(100, dim)
+        assert len(points) == dim  # nosec B101
+        for point in points:
+            assert point.shape == (100, 1)  # nosec B101
+            assert point.requires_grad is True  # nosec B101
+            assert torch.all(point <= 1) and torch.all(
+                point >= 0)  # nosec B101
+
+
+def test_generate_plot_dirichlett_neumann():
+    for dim in [1, 2, 3]:
+        for mode in ['dirichlet', 'neumann']:
+            fig, l2_loss_text = prp.generate_plot(
+                2, 2, 50, dim, mode, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+            loss_value = float(l2_loss_text.split('=')[1])
+
+            assert not math.isnan(loss_value)  # nosec B101
+            assert loss_value >= 0  # nosec B101
+
+
+def test_generate_plot_exact():
+    fig, l2_loss_text = prp.generate_plot(
+        5, 5, 100, 1, 'exact', 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+    loss_value = float(l2_loss_text.split('=')[1])
+    assert not math.isnan(loss_value)  # nosec B101
+    assert loss_value >= 0  # nosec B101
