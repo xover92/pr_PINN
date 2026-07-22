@@ -1,6 +1,6 @@
 [project]
 name = 'pr_PINN'
-version = '0.0.2'
+version = '0.1.6'
 authors = [
   { name='Francesco Colombo', email='francesco.colombo10@studio.unibo.it' },
 ]
@@ -10,8 +10,6 @@ requires-python = '>=3.10'
 license = {text = 'GPLv3'}
 keywords = [
   'machine-learning',
-  'exercise',
-  'software-development',
 ]
 maintainers = [
   { name='Francesco Colombo', email='francesco.colombo10@studio.unibo.it' },
@@ -30,7 +28,12 @@ classifiers = [
 ]
 dependencies = [
   'numpy',
-  'torch'
+  'torch',
+  'pytest',
+  'gradio',
+  'matplotlib',
+  'IPython',
+  'fipy',
 ]
 
 [project.scripts]
@@ -53,3 +56,6 @@ requires = [
   'setuptools>=42',
 ]
 build-backend = 'setuptools.build_meta'
+
+[tool.bandit]
+exclude_dirs = ["test"]
