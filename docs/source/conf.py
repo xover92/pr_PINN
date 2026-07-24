@@ -9,7 +9,7 @@
 project = 'pr_PINN'
 copyright = '2026, Francesco-Colombo'
 author = 'Francesco-Colombo'
-release = '0.0.2'
+release = '0.2.0'
 
 master_doc = 'index'
 

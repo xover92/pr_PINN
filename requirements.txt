@@ -3,6 +3,7 @@ torch
 pytest
 gradio
 matplotlib
+math
 sphinx
 IPython
 sphinx_rtd_theme

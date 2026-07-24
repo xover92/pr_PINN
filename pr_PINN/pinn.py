@@ -7,6 +7,7 @@ import numpy as np
 from fipy import CellVariable, Grid1D, Grid2D
 from fipy import Grid3D, TransientTerm, DiffusionTerm
 import matplotlib.cm as cm
+import math
 
 
 class PINN(nn.Module):
@@ -321,6 +322,143 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
     return loss
 
 
+def lhs_sample_generator_sphere_boundary(
+    n_points: int, dim: int,
+) -> tuple[torch.Tensor, torch.Tensor] | tuple[
+        torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Generates on the sphere/circle boundary a number of points using lhs.
+
+    Parameters
+    ----------
+        n_points:int
+            The numer of points to be generated.
+        dim:int
+            the number of spatial dimensions (either 2 or 3).
+
+    Returns
+    -------
+        tuple[torch.Tensor, ...]
+            the spatial coordinates of the generated points.
+    """
+
+    lhs_samples_tuple = lhs_sample_generator(
+        n_points, dim-1)  # points generated with lhs
+
+    # then they are transformed them into polar/spherical coords
+    if dim == 3:
+        longitude = lhs_samples_tuple[0]*2*math.pi
+        # not by rescaling for spatial uniformity
+        colatitude = torch.acos(1 - 2*lhs_samples_tuple[1])
+
+        x = torch.sin(colatitude)*torch.cos(longitude)
+        y = torch.sin(colatitude)*torch.sin(longitude)
+        z = torch.cos(colatitude)
+        return x, y, z
+    if dim == 2:
+        rho = lhs_samples_tuple[0]*2*math.pi
+
+        x = torch.cos(rho)
+        y = torch.sin(rho)
+        return x, y
+
+
+def neumann_condition_sphere(*coordinates: torch.Tensor,
+                             t: torch.Tensor, model: nn.Module) -> float:
+    """
+    Calculates the loss for Neumann conditions in a circle/sphere.
+
+    Parameters
+    ----------
+        *coordinates: torch.Tensor
+            The spatial coordinates.
+        t: torch.Tensor
+            The temporal coordinates.
+        model: nn.Module
+            The PINN.
+
+    Returns
+    -------
+        loss: float
+        The loss determined by Neumann conditions.
+    """
+    loss = 0.0
+    u_b = model(*coordinates, t=t)
+    inshort = torch.ones_like(u_b)
+    # compute the first derivative and sum it to the loss
+    neumann = sum(torch.autograd.grad(u_b, coord, create_graph=True,
+                                      grad_outputs=inshort)[0]*coord
+                  for coord in coordinates)
+    loss += torch.mean(neumann**2)
+    return loss
+
+
+def loss_function_sphere(*coordinates: torch.Tensor, t: torch.Tensor,
+                         n_points: int, dim: int,
+                         value_t0: float, model: nn.Module) -> float:
+    """
+    Calculates the total loss for a sphere/circle
+
+    Parameters
+    ----------
+        *coordinates: torch.Tensor
+            The spatial coordinates.
+        t: torch.Tensor
+            The temporal coordinates.
+        n_points: int
+            The number of points (used for the boundary)
+        dim: int
+            The number of spatial dimmensions (either 2 or 3)
+        value_t0: float
+            The initial condition.
+        model: nn.Module
+            The PINN.
+
+    Returns
+    -------
+        total_loss:f loat
+            The total loss, with a weight of 3 for the boundary conditions one
+            and the one for the condition of u=0 outside the sphere/circle.
+    """
+
+    # boundary loss
+    if dim == 2:
+        x, y = lhs_sample_generator_sphere_boundary(n_points, dim)
+        loss_bc = neumann_condition_sphere(x, y, t=t, model=model)
+    if dim == 3:
+        x, y, z = lhs_sample_generator_sphere_boundary(n_points, dim)
+        loss_bc = neumann_condition_sphere(x, y, z, t=t, model=model)
+
+    # loss for u=0 outside the sphere
+    # (nis stands for not in sphere)
+    r_squared = sum(coord**2 for coord in coordinates)
+    outside_mask = r_squared > 1
+    coords_out = [
+        coord[outside_mask].view(-1, 1) for coord in coordinates]
+    t_out = t[outside_mask].view(-1, 1)
+    u_out = model(*coords_out, t=t_out)
+    loss_nis = torch.mean(u_out**2)
+
+    # physics loss, only inside the sphere
+    inside_mask = r_squared <= 1
+    coords_in = [
+        coord[inside_mask].view(-1, 1) for coord in coordinates]
+    t_in = t[inside_mask].view(-1, 1)
+    loss_pde = torch.mean(pde_residual(*coords_in, t=t_in, model=model)**2)
+
+    # initial condition loss (outside the sphere u=0)
+    u_pr_in = model(*coords_in, t=torch.zeros_like(t_in))
+    u_ex_in = torch.full_like(t_in, value_t0)
+    u_pr_out = model(*coords_out, t=torch.zeros_like(t_out))
+    u_ex_out = torch.zeros_like(t_out)
+    u_pr = torch.cat([u_pr_in, u_pr_out], dim=0)
+    u_ex = torch.cat([u_ex_in, u_ex_out], dim=0)
+    loss_ic = torch.mean((u_pr-u_ex)**2)
+
+    total_loss = 3*loss_bc+loss_pde+loss_ic+3*loss_nis
+    return total_loss
+
+
 def exact_solution_1D(x: torch.Tensor,
                       t: torch.Tensor,
                       D: float = 0.01,
@@ -403,20 +541,31 @@ def training_loop(n_epochs: int, n_neurons: int,
                 if hasattr(m, 'reset_parameters') else None)
 
     # sample point generation
-    all_samples = lhs_sample_generator(n_points, dim+1)
-    spatial_coords = all_samples[:-1]
+    all_samples = list(lhs_sample_generator(n_points, dim+1))
+    # when trying to make a sphere, the points
+    # need to be stretched in the domain [-1, 1]
+    if mode == 'sphere':
+        for i in range(dim):
+            all_samples[i] = ((all_samples[i] - 0.5) *
+                              2).detach().requires_grad_(True)
+
+    spatial_coords = tuple(all_samples[:-1])
     t = all_samples[-1]
 
     loss_list = []
 
     for epoch in range(n_epochs):
         model.train()
-
-        loss = loss_function(*spatial_coords, t=t, model=model, mode=mode,
-                             value_x0=value_x0, value_x1=value_x1,
-                             value_y0=value_y0, value_y1=value_y1,
-                             value_z0=value_z0, value_z1=value_z1,
-                             value_t0=value_t0)
+        if mode != 'sphere':
+            loss = loss_function(*spatial_coords, t=t, model=model, mode=mode,
+                                 value_x0=value_x0, value_x1=value_x1,
+                                 value_y0=value_y0, value_y1=value_y1,
+                                 value_z0=value_z0, value_z1=value_z1,
+                                 value_t0=value_t0)
+        else:
+            loss = loss_function_sphere(
+                *spatial_coords, n_points=n_points,
+                t=t, dim=dim, model=model, value_t0=value_t0)
 
         # collect loss for loss evolution
         if epoch % 10 == 0:
@@ -436,7 +585,7 @@ def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
                     value_t0: float) -> list:
     """
     Solves the equation with fipy with
-    dirichlet boundary conditions.
+    dirichlet or neumann boundary conditions.
 
     Parameters
     ----------
@@ -596,6 +745,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
     value_z1 = float(value_z1)
     value_t0 = float(value_t0)
 
+    if mode == 'sphere' and dim == 1:
+        raise NameError('Mode sphere only works with dim!=1')
     # collect the two solutions
     model, loss_list = training_loop(
         n_epocs, n_neurons, n_points, dim, mode, value_x0,
@@ -707,6 +858,9 @@ def generate_plot(n_epocs: int, n_neurons: int,
 
         plt.tight_layout()
 
+        l2_loss = nn.functional.mse_loss(u_exact_tensor, u_pred_tensor)
+        l2_loss_text = f'L2 loss={l2_loss}'
+
     else:
         if dim == 2:
             x_test = x_test.numpy().reshape(20, 20, 20)
@@ -743,37 +897,44 @@ def generate_plot(n_epocs: int, n_neurons: int,
         norm_pred = plt.Normalize(u_ds.min(), u_ds.max())
         colors = cm.viridis(norm_pred(u_ds))
         colors[..., 3] = 1.0
-
-        fipy_matrices = [item[0] if isinstance(
-            item, (tuple, list)) else item for item in history]
-        u_exact = np.stack(fipy_matrices, axis=-1)
-        u_exact_tensor = torch.Tensor(u_exact).reshape(-1, 1)
-        u_exact_ds = u_exact[::ds, ::ds, ::ds]
-        norm_exact = plt.Normalize(u_exact_ds.min(), u_exact_ds.max())
-
-        if dim == 3:
-            u_exact = history[9][0]  # fixing t
+        if mode != 'sphere':
+            fipy_matrices = [item[0] if isinstance(
+                item, (tuple, list)) else item for item in history]
+            u_exact = np.stack(fipy_matrices, axis=-1)
+            u_exact_tensor = torch.Tensor(u_exact).reshape(-1, 1)
             u_exact_ds = u_exact[::ds, ::ds, ::ds]
+            norm_exact = plt.Normalize(u_exact_ds.min(), u_exact_ds.max())
 
-        # set the color scale
-        colors_exact = cm.viridis(norm_exact(u_exact_ds))
-        colors_exact[..., 3] = 1.0
+            if dim == 3:
+                u_exact = history[9][0]  # fixing t
+                u_exact_ds = u_exact[::ds, ::ds, ::ds]
+
+            # set the color scale
+            colors_exact = cm.viridis(norm_exact(u_exact_ds))
+            colors_exact[..., 3] = 1.0
 
         fig = plt.figure(figsize=(16, 5))
 
         # voxel plot of the prediction
-        ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+        if mode != 'sphere':
+            ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+        else:
+            ax1 = fig.add_subplot(1, 2, 1, projection='3d')
         ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
         ax1.set_title("Prediction (PINN)")
 
-        # voxel plot of the fipy solution
-        ax_exact = fig.add_subplot(1, 3, 2, projection='3d')
-        ax_exact.voxels(voxels, facecolors=colors_exact,
-                        edgecolor='k', linewidth=0.2)
-        ax_exact.set_title("Exact (FiPy)")
+        if mode != 'sphere':
+            # voxel plot of the fipy solution
+            ax_exact = fig.add_subplot(1, 3, 2, projection='3d')
+            ax_exact.voxels(voxels, facecolors=colors_exact,
+                            edgecolor='k', linewidth=0.2)
+            ax_exact.set_title("Exact (FiPy)")
 
         # plot of the loss
-        ax2 = fig.add_subplot(1, 3, 3)
+        if mode != 'sphere':
+            ax2 = fig.add_subplot(1, 3, 3)
+        else:
+            ax2 = fig.add_subplot(1, 2, 2)
         ax2.plot(epochs, losses, label="loss")
         ax2.set_yscale('log')
         ax2.set_xlabel('epoch')
@@ -781,10 +942,12 @@ def generate_plot(n_epocs: int, n_neurons: int,
         ax2.grid(True)
 
         plt.tight_layout()
+        if mode != 'sphere':
+            # compute the loss
+            l2_loss = nn.functional.mse_loss(u_exact_tensor, u_pred_tensor)
 
-    # compute the loss
-    l2_loss = nn.functional.mse_loss(u_exact_tensor, u_pred_tensor)
-
-    l2_loss_text = f'L2 loss={l2_loss}'
+            l2_loss_text = f'L2 loss={l2_loss}'
+        else:
+            l2_loss_text = 'No way to calculate L2 loss for mode sphere'
 
     return fig, l2_loss_text
