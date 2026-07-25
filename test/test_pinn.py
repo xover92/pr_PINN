@@ -3,19 +3,22 @@ import torch.nn as nn
 import math
 import pytest
 import pr_PINN.pinn as prp
+import itertools
 
 # lhs_sample_generator: shape checking
+# lhs for sphere: shape and value check
 # pde_residual: tested
 # neumann_condition: tested
+# neumann for sphere: tested
 # dirichlet_condition: tested
 # loss_function: tested in 1d by itself and in other dimensions
 #                by dependencies
+# loss for sphere: tested dependencies
 # exact_solution_1d: tested
 # training_loop: tested by dependencies
 # solve with fipy: not tested (depends on native funcs)
 # generate_plot: tested dependencies, done branching test
-
-# TODO change the test points logic by using itertools
+#  (also done sphere part)
 
 
 class quadratic_model_1d(nn.Module):
@@ -45,13 +48,18 @@ def quad_dummy_model():
     return get_model
 
 
-@pytest.mark.parametrize("x_res_1d, t_res_1d, exp_res_1d", [
-    (0.0, 0.0, 0.98),
-    (1.0, 0.0, 0.98),
-    (0.0, 1.0, 0.98),
-    (1.0, 1.0, 2.98),
-    (0.5, 0.5, 0.7925)
-])
+x_vals = [0.0, 1.0, 0.5]
+y_vals = [0.0, 1.0, 0.5]
+z_vals = [0.0, 1.0, 0.5]
+t_vals = [0.0, 1.0, 0.5]
+
+test_cases_pde1d = [
+    (x, t, 1-0.02-(x**2+t)*(1-x**2-t))
+    for x, t in itertools.product(x_vals, t_vals)
+]
+
+
+@pytest.mark.parametrize("x_res_1d, t_res_1d, exp_res_1d", test_cases_pde1d)
 def test_pde_residual_1d(quad_dummy_model, x_res_1d, t_res_1d, exp_res_1d):
     """
     Tests wheter the residual is computed correctly, evaluating in the
@@ -63,17 +71,13 @@ def test_pde_residual_1d(quad_dummy_model, x_res_1d, t_res_1d, exp_res_1d):
     assert residual.isclose(torch.tensor([[exp_res_1d]]))  # nosec B101
 
 
-@pytest.mark.parametrize("x_res, y_res, t_res, exp_res", [
-    (0.0, 0.0, 0.0, 0.96),
-    (1.0, 0.0, 0.0, 0.96),
-    (0.0, 1.0, 0.0, 0.96),
-    (0.0, 0.0, 1.0, 0.96),
-    (1.0, 0.0, 1.0, 2.96),
-    (0.0, 1.0, 1.0, 2.96),
-    (1.0, 1.0, 0.0, 2.96),
-    (1.0, 1.0, 1.0, 6.96),
-    (0.5, 0.5, 0.5, 0.96),
-])
+test_cases_pde2d = [
+    (x, y, t, 1-0.04-(x**2+y**2+t)*(1-x**2-y**2-t))
+    for x, y, t in itertools.product(x_vals, y_vals, t_vals)
+]
+
+
+@pytest.mark.parametrize("x_res, y_res, t_res, exp_res", test_cases_pde2d)
 def test_pde_residual_2d(quad_dummy_model, x_res, y_res, t_res, exp_res):
     """
     Tests wheter the residual is computed correctly, evaluating in the
@@ -86,25 +90,14 @@ def test_pde_residual_2d(quad_dummy_model, x_res, y_res, t_res, exp_res):
     assert residual.isclose(torch.tensor([[exp_res]]))  # nosec B101
 
 
-@pytest.mark.parametrize("x_res, y_res, z_res, t_res, exp_res", [
-    (0.0, 0.0, 0.0, 0.0, 0.94),
-    (1.0, 0.0, 0.0, 0.0, 0.94),
-    (0.0, 1.0, 0.0, 0.0, 0.94),
-    (0.0, 0.0, 1.0, 0.0, 0.94),
-    (1.0, 0.0, 1.0, 0.0, 2.94),
-    (0.0, 1.0, 1.0, 0.0, 2.94),
-    (1.0, 1.0, 0.0, 0.0, 2.94),
-    (1.0, 1.0, 1.0, 0.0, 6.94),
-    (0.0, 0.0, 0.0, 1.0, 0.94),
-    (1.0, 0.0, 0.0, 1.0, 2.94),
-    (0.0, 1.0, 0.0, 1.0, 2.94),
-    (0.0, 0.0, 1.0, 1.0, 2.94),
-    (1.0, 0.0, 1.0, 1.0, 6.94),
-    (0.0, 1.0, 1.0, 1.0, 6.94),
-    (1.0, 1.0, 0.0, 1.0, 6.94),
-    (1.0, 1.0, 1.0, 1.0, 12.94),
-    (0.5, 0.5, 0.5, 0.5, 1.2525),
-])
+test_cases_pde3d = [
+    (x, y, z, t, 1-0.06-(x**2+y**2+z**2+t)*(1-x**2-y**2-z**2-t))
+    for x, y, z, t in itertools.product(x_vals, y_vals, z_vals, t_vals)
+]
+
+
+@pytest.mark.parametrize("x_res, y_res, z_res, t_res, exp_res",
+                         test_cases_pde3d)
 def test_pde_residual_3d(quad_dummy_model, x_res, y_res, z_res,
                          t_res, exp_res):
     """
@@ -119,12 +112,11 @@ def test_pde_residual_3d(quad_dummy_model, x_res, y_res, z_res,
     assert residual.isclose(torch.tensor([[exp_res]]))  # nosec B101
 
 
-@pytest.mark.parametrize("x_val, t_val, expected", [
-    (0.0, 0.0, 0.25),
-    (1.0, 0.0, 2.750890767e-4),
-    (0.0, 1.0, 0.4858916454),
-    (0.5, 0.5, 0.0270849034)
-])
+test_cases_exact_sol = [(x, t, (1+math.exp((0.06**-0.5)*x-5*t/6))**-2)
+                        for x, t in itertools.product(x_vals, t_vals)]
+
+
+@pytest.mark.parametrize("x_val, t_val, expected", test_cases_exact_sol)
 def test_exact_solution_1d(x_val, t_val, expected):
     """
     Tests wheter the exact solution is computed correctly, evaluating in the
@@ -147,12 +139,10 @@ def oracle():
     return oracle_model()
 
 
-@pytest.mark.parametrize("x_val, t_val", [
-    (0.0, 0.0),
-    (1.0, 0.0),
-    (0.0, 1.0),
-    (0.5, 0.5)
-])
+test_cases_loss1d = list(itertools.product(x_vals, t_vals))
+
+
+@pytest.mark.parametrize("x_val, t_val", test_cases_loss1d)
 def test_loss_1d(x_val, t_val, oracle):
     """
     Tests whete the loss is computed correclty by employing oracle testing.
@@ -167,12 +157,7 @@ def test_loss_1d(x_val, t_val, oracle):
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)  # nosec B101
 
 
-@pytest.mark.parametrize("x_val, t_val", [
-    (0.0, 0.0),
-    (1.0, 0.0),
-    (0.0, 1.0),
-    (0.5, 0.5)
-])
+@pytest.mark.parametrize("x_val, t_val", test_cases_loss1d)
 def test_loss_neumann(x_val, t_val, quad_dummy_model):
     x = torch.Tensor([[x_val]])
     t = torch.Tensor([[t_val]])
@@ -183,17 +168,10 @@ def test_loss_neumann(x_val, t_val, quad_dummy_model):
     assert torch.allclose(loss, torch.tensor([[4.0]]), atol=1e-4)  # nosec B101
 
 
-@pytest.mark.parametrize("x_res, y_res, t_res", [
-    (0.0, 0.0, 0.0),
-    (1.0, 0.0, 0.0),
-    (0.0, 1.0, 0.0),
-    (0.0, 0.0, 1.0),
-    (1.0, 0.0, 1.0),
-    (0.0, 1.0, 1.0),
-    (1.0, 1.0, 0.0),
-    (1.0, 1.0, 1.0),
-    (0.5, 0.5, 0.5),
-])
+test_cases_loss2d = list(itertools.product(x_vals, y_vals, t_vals))
+
+
+@pytest.mark.parametrize("x_res, y_res, t_res", test_cases_loss2d)
 def test_loss_neumann_2d(x_res,  y_res, t_res, quad_dummy_model):
     x = torch.Tensor([[x_res]])
     y = torch.Tensor([[y_res]])
@@ -206,25 +184,10 @@ def test_loss_neumann_2d(x_res,  y_res, t_res, quad_dummy_model):
     assert torch.allclose(loss, torch.tensor([[8.0]]), atol=1e-4)  # nosec B101
 
 
-@pytest.mark.parametrize("x_res, y_res, z_res, t_res", [
-    (0.0, 0.0, 0.0, 0.0),
-    (1.0, 0.0, 0.0, 0.0),
-    (0.0, 1.0, 0.0, 0.0),
-    (0.0, 0.0, 1.0, 0.0),
-    (1.0, 0.0, 1.0, 0.0),
-    (0.0, 1.0, 1.0, 0.0),
-    (1.0, 1.0, 0.0, 0.0),
-    (1.0, 1.0, 1.0, 0.0),
-    (0.0, 0.0, 0.0, 1.0),
-    (1.0, 0.0, 0.0, 1.0),
-    (0.0, 1.0, 0.0, 1.0),
-    (0.0, 0.0, 1.0, 1.0),
-    (1.0, 0.0, 1.0, 1.0),
-    (0.0, 1.0, 1.0, 1.0),
-    (1.0, 1.0, 0.0, 1.0),
-    (1.0, 1.0, 1.0, 1.0),
-    (0.5, 0.5, 0.5, 0.5),
-])
+test_cases_loss3d = list(itertools.product(x_vals, y_vals, z_vals, t_vals))
+
+
+@pytest.mark.parametrize("x_res, y_res, z_res, t_res", test_cases_loss3d)
 def test_loss_neumann_3d(x_res,  y_res, z_res, t_res, quad_dummy_model):
     x = torch.Tensor([[x_res]])
     y = torch.Tensor([[y_res]])
@@ -240,14 +203,14 @@ def test_loss_neumann_3d(x_res,  y_res, z_res, t_res, quad_dummy_model):
         [[12.0]]), atol=1e-4)  # nosec B101
 
 
-@pytest.mark.parametrize("x_val, t_val, exp_val_x0, exp_val_x1", [
-    (0.0, 0.0, 0.0, 1.0),
-    (1.0, 0.0, 0.0, 1.0),
-    (0.0, 1.0, 1.0, 2.0),
-    (0.5, 0.5, 0.50, 1.50)
-])
-def test_loss_dirichlet(x_val, t_val, exp_val_x0, exp_val_x1,
-                        quad_dummy_model):
+test_cases_dirichlet1d = [(x, t, t, 1+t)
+                          for x, t in itertools.product(x_vals, t_vals)]
+
+
+@pytest.mark.parametrize("x_val, t_val, exp_val_x0, exp_val_x1",
+                         test_cases_dirichlet1d)
+def test_loss_dirichlet_1d(x_val, t_val, exp_val_x0, exp_val_x1,
+                           quad_dummy_model):
     x = torch.Tensor([[x_val]])
     t = torch.Tensor([[t_val]])
     x.requires_grad = True
@@ -258,18 +221,14 @@ def test_loss_dirichlet(x_val, t_val, exp_val_x0, exp_val_x1,
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)  # nosec B101
 
 
+test_cases_dirichlet2d = [(x, y, t, y**2+t, y**2+1+t, x**2+t, x**2+1+t)
+                          for x, y, t in itertools.product(x_vals,
+                                                           y_vals, t_vals)]
+
+
 @pytest.mark.parametrize(
-    "x_val, y_val, t_val, exp_val_x0, exp_val_x1, exp_val_y0, exp_val_y1", [
-        (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0),
-        (1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0),
-        (0.0, 1.0, 0.0, 1.0, 2.0, 0.0, 1.0),
-        (0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0),
-        (1.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0),
-        (0.0, 1.0, 1.0, 2.0, 3.0, 1.0, 2.0),
-        (1.0, 1.0, 0.0, 1.0, 2.0, 1.0, 2.0),
-        (1.0, 1.0, 1.0, 2.0, 3.0, 2.0, 3.0),
-        (0.5, 0.5, 0.5, 0.75, 1.75, 0.75, 1.75),
-    ])
+    "x_val, y_val, t_val, exp_val_x0, exp_val_x1, exp_val_y0, exp_val_y1",
+    test_cases_dirichlet2d)
 def test_loss_dirichlet_2d(x_val, y_val, t_val, exp_val_x0, exp_val_x1,
                            exp_val_y0, exp_val_y1,
                            quad_dummy_model):
@@ -286,26 +245,16 @@ def test_loss_dirichlet_2d(x_val, y_val, t_val, exp_val_x0, exp_val_x1,
     assert torch.allclose(loss, torch.tensor([[0.0]]), atol=1e-4)  # nosec B101
 
 
+test_cases_dirichlet3d = [(x, y, z, t, y**2+z**2+t, y**2+z**2+1+t, x**2+z**2+t,
+                           x**2+z**2+1+t, x**2+y**2+t, x**2+y**2+1+t)
+                          for x, y, z, t in itertools.product(x_vals,
+                                                              y_vals,
+                                                              z_vals, t_vals)]
+
+
 @pytest.mark.parametrize(
-    "x_val, y_val, z_val, t_val, x0, x1, y0, y1, z0, z1", [
-        (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
-        (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0),
-        (0.0, 1.0, 0.0, 0.0, 1.0, 2.0, 0.0, 1.0, 1.0, 2.0),
-        (0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 1.0, 2.0, 0.0, 1.0),
-        (1.0, 0.0, 1.0, 0.0, 1.0, 2.0, 2.0, 3.0, 1.0, 2.0),
-        (0.0, 1.0, 1.0, 0.0, 2.0, 3.0, 1.0, 2.0, 1.0, 2.0),
-        (1.0, 1.0, 0.0, 0.0, 1.0, 2.0, 1.0, 2.0, 2.0, 3.0),
-        (1.0, 1.0, 1.0, 0.0, 2.0, 3.0, 2.0, 3.0, 2.0, 3.0),
-        (0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0),
-        (1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 2.0, 3.0),
-        (0.0, 1.0, 0.0, 1.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0),
-        (0.0, 0.0, 1.0, 1.0, 2.0, 3.0, 2.0, 3.0, 1.0, 2.0),
-        (1.0, 0.0, 1.0, 1.0, 2.0, 3.0, 3.0, 4.0, 2.0, 3.0),
-        (0.0, 1.0, 1.0, 1.0, 3.0, 4.0, 2.0, 3.0, 2.0, 3.0),
-        (1.0, 1.0, 0.0, 1.0, 2.0, 3.0, 2.0, 3.0, 3.0, 4.0),
-        (1.0, 1.0, 1.0, 1.0, 3.0, 4.0, 3.0, 4.0, 3.0, 4.0),
-        (0.5, 0.5, 0.5, 0.5, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0),
-    ])
+    "x_val, y_val, z_val, t_val, x0, x1, y0, y1, z0, z1",
+    test_cases_dirichlet3d)
 def test_loss_dirichlet_3d(x_val, y_val, z_val, t_val, x0, x1,
                            y0, y1, z0, z1,
                            quad_dummy_model):
@@ -336,20 +285,82 @@ def test_lhs_sample_shape_and_properties():
                 point >= 0)  # nosec B101
 
 
+def test_lhs_sphere_shape_and_properties():
+    for dim in [2, 3]:
+        points = prp.lhs_sample_generator_sphere_boundary(100, dim)
+        assert len(points) == dim  # nosec B101
+        radius = 0
+        for point in points:
+            assert point.shape == (100, 1)  # nosec B101
+            assert point.requires_grad is True  # nosec B101
+            assert torch.all(point <= 1) and torch.all(
+                point >= -1)  # nosec B101
+            radius += point**2
+        assert torch.allclose(radius, torch.ones_like(radius))  # nosec B101
+
+
+test_cases_sphere2d = [(x, y, t, (2*x**2+2*y**2)**2)
+                       for x, y, t in itertools.product(x_vals,
+                                                        y_vals, t_vals)]
+
+
+@pytest.mark.parametrize("x_val, y_val, t_val, exp_val", test_cases_sphere2d)
+def test_neumann_sphere_2d(x_val, y_val, t_val, exp_val, quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    y = torch.Tensor([[y_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    y.requires_grad = True
+    t.requires_grad = True
+    loss = prp.neumann_condition_sphere(
+        x, y, t=t, model=quad_dummy_model(2))
+    assert torch.allclose(loss, torch.tensor(
+        [[exp_val]]), atol=1e-4)  # nosec B101
+
+
+test_cases_sphere3d = [(x, y, z, t, (2*x**2+2*y**2+2*z**2)**2)
+                       for x, y, z, t in itertools.product(x_vals,
+                                                           y_vals, z_vals,
+                                                           t_vals)]
+
+
+@pytest.mark.parametrize("x_val, y_val, z_val, t_val, exp_val",
+                         test_cases_sphere3d)
+def test_neumann_sphere_3d(x_val, y_val, z_val, t_val, exp_val,
+                           quad_dummy_model):
+    x = torch.Tensor([[x_val]])
+    y = torch.Tensor([[y_val]])
+    z = torch.Tensor([[z_val]])
+    t = torch.Tensor([[t_val]])
+    x.requires_grad = True
+    y.requires_grad = True
+    z.requires_grad = True
+    t.requires_grad = True
+    loss = prp.neumann_condition_sphere(
+        x, y, z, t=t, model=quad_dummy_model(3))
+    assert torch.allclose(loss, torch.tensor(
+        [[exp_val]]), atol=1e-4)  # nosec B101
+
+
 def test_generate_plot_dirichlett_neumann():
     for dim in [1, 2, 3]:
         for mode in ['dirichlet', 'neumann']:
             fig, l2_loss_text = prp.generate_plot(
-                2, 2, 50, dim, mode, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+                2, 2, 25, dim, mode, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
             loss_value = float(l2_loss_text.split('=')[1])
-
             assert not math.isnan(loss_value)  # nosec B101
             assert loss_value >= 0  # nosec B101
 
 
 def test_generate_plot_exact():
     fig, l2_loss_text = prp.generate_plot(
-        5, 5, 100, 1, 'exact', 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+        2, 2, 25, 1, 'exact', 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
     loss_value = float(l2_loss_text.split('=')[1])
     assert not math.isnan(loss_value)  # nosec B101
     assert loss_value >= 0  # nosec B101
+
+
+def test_generate_plot_sphere():
+    for dim in [2, 3]:
+        fig, l2_loss_text = prp.generate_plot(
+            2, 2, 25, dim, 'sphere', 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)

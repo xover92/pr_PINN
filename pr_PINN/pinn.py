@@ -384,10 +384,10 @@ def neumann_condition_sphere(*coordinates: torch.Tensor,
     """
     loss = 0.0
     u_b = model(*coordinates, t=t)
-    inshort = torch.ones_like(u_b)
+    output_type = torch.ones_like(u_b)
     # compute the first derivative and sum it to the loss
     neumann = sum(torch.autograd.grad(u_b, coord, create_graph=True,
-                                      grad_outputs=inshort)[0]*coord
+                                      grad_outputs=output_type)[0]*coord
                   for coord in coordinates)
     loss += torch.mean(neumann**2)
     return loss
