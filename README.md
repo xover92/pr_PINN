@@ -76,10 +76,15 @@ In order to run it, type:
 ```bash
 $ python -m pr_PINN
 ```
-When ran, it will show a local link. By clicking on it, you will access the gradio GUI, where you will be able to test the program.
+When ran, it will show a local link. By clicking on it, you will access the gradio GUI, where you will be able to use the program.
 ## Testing
 
-**TODO**
+### How to test
+
+The project's testing was written using pytest, and as such the command line command to test it is, once in the project's folder:
+```bash
+$ python -m pytest -v ./test/
+```
 
 ## Table of contents
 
