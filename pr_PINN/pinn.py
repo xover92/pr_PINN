@@ -363,6 +363,56 @@ def lhs_sample_generator_sphere_boundary(
         return x, y
 
 
+def lhs_sample_generator_sphere_inside(
+    n_points: int, dim: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Generates a number of points inside the sphere using lhs.
+
+    Parameters
+    ----------
+        n_points:int
+            The numer of points to be generated.
+        dim:int
+            the number of spatial dimensions (either 2 or 3).
+
+    Returns
+    -------
+        tuple[torch.Tensor, ...]
+            the coordinates of the generated points.
+    """
+
+    lhs_samples_tuple = lhs_sample_generator(
+        n_points, dim+1)  # points generated with lhs
+
+    t = lhs_samples_tuple[dim]
+
+    # then they are transformed them into polar/spherical coords
+    if dim == 3:
+        # reshaped for volume uniformity
+        radius = torch.pow(lhs_samples_tuple[2], 1/3)
+        longitude = lhs_samples_tuple[0]*2*math.pi
+        # not by rescaling for spatial uniformity
+        colatitude = torch.acos(1 - 2*lhs_samples_tuple[1])
+
+        x = (radius*torch.sin(colatitude)*torch.cos(longitude)
+             ).detach().requires_grad_(True)
+        y = (radius*torch.sin(colatitude)*torch.sin(longitude)
+             ).detach().requires_grad_(True)
+        z = (radius*torch.cos(colatitude)).detach().requires_grad_(True)
+
+        return x, y, z, t
+    if dim == 2:
+        # resh for area uniformity
+        rho = lhs_samples_tuple[0]*2*math.pi
+        radius = torch.sqrt(lhs_samples_tuple[1])
+
+        x = (radius*torch.cos(rho)).detach().requires_grad_(True)
+        y = (radius*torch.sin(rho)).detach().requires_grad_(True)
+        return x, y, t
+
+
 def neumann_condition_sphere(*coordinates: torch.Tensor,
                              t: torch.Tensor, model: nn.Module) -> float:
     """
@@ -416,9 +466,8 @@ def loss_function_sphere(*coordinates: torch.Tensor, t: torch.Tensor,
 
     Returns
     -------
-        total_loss:f loat
-            The total loss, with a weight of 3 for the boundary conditions one
-            and the one for the condition of u=0 outside the sphere/circle.
+        total_loss: float
+            The total loss.
     """
 
     # boundary loss
@@ -429,33 +478,15 @@ def loss_function_sphere(*coordinates: torch.Tensor, t: torch.Tensor,
         x, y, z = lhs_sample_generator_sphere_boundary(n_points, dim)
         loss_bc = neumann_condition_sphere(x, y, z, t=t, model=model)
 
-    # loss for u=0 outside the sphere
-    # (nis stands for not in sphere)
-    r_squared = sum(coord**2 for coord in coordinates)
-    outside_mask = r_squared > 1
-    coords_out = [
-        coord[outside_mask].view(-1, 1) for coord in coordinates]
-    t_out = t[outside_mask].view(-1, 1)
-    u_out = model(*coords_out, t=t_out)
-    loss_nis = torch.mean(u_out**2)
-
     # physics loss, only inside the sphere
-    inside_mask = r_squared <= 1
-    coords_in = [
-        coord[inside_mask].view(-1, 1) for coord in coordinates]
-    t_in = t[inside_mask].view(-1, 1)
-    loss_pde = torch.mean(pde_residual(*coords_in, t=t_in, model=model)**2)
+    loss_pde = torch.mean(pde_residual(*coordinates, t=t, model=model)**2)
 
-    # initial condition loss (outside the sphere u=0)
-    u_pr_in = model(*coords_in, t=torch.zeros_like(t_in))
-    u_ex_in = torch.full_like(t_in, value_t0)
-    u_pr_out = model(*coords_out, t=torch.zeros_like(t_out))
-    u_ex_out = torch.zeros_like(t_out)
-    u_pr = torch.cat([u_pr_in, u_pr_out], dim=0)
-    u_ex = torch.cat([u_ex_in, u_ex_out], dim=0)
+    # initial condition loss
+    u_pr = model(*coordinates, t=torch.zeros_like(t))
+    u_ex = torch.full_like(t, value_t0)
     loss_ic = torch.mean((u_pr-u_ex)**2)
 
-    total_loss = 3*loss_bc+loss_pde+loss_ic+3*loss_nis
+    total_loss = loss_bc+loss_pde+loss_ic
     return total_loss
 
 
@@ -541,13 +572,10 @@ def training_loop(n_epochs: int, n_neurons: int,
                 if hasattr(m, 'reset_parameters') else None)
 
     # sample point generation
-    all_samples = list(lhs_sample_generator(n_points, dim+1))
-    # when trying to make a sphere, the points
-    # need to be stretched in the domain [-1, 1]
-    if mode == 'sphere':
-        for i in range(dim):
-            all_samples[i] = ((all_samples[i] - 0.5) *
-                              2).detach().requires_grad_(True)
+    if mode != 'sphere':
+        all_samples = list(lhs_sample_generator(n_points, dim+1))
+    else:
+        all_samples = list(lhs_sample_generator_sphere_inside(n_points, dim))
 
     spatial_coords = tuple(all_samples[:-1])
     t = all_samples[-1]
@@ -757,10 +785,17 @@ def generate_plot(n_epocs: int, n_neurons: int,
                               value_z0, value_z1, value_t0)
 
     # initializing the testing points
-    x_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
-    y_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
-    z_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
     t_test = torch.linspace(0, 1, 20).view(-1, 1)
+
+    if mode != 'sphere':
+        x_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
+        y_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
+        z_test = torch.linspace(0.025, 0.975, 20).view(-1, 1)
+
+    else:
+        x_test = torch.linspace(-1, 1, 20).view(-1, 1)
+        y_test = torch.linspace(-1, 1, 20).view(-1, 1)
+        z_test = torch.linspace(-1, 1, 20).view(-1, 1)
 
     # runs different meshgrids and operations for differents dims
     # namely dim=3 needs a different set of points to calculate the loss since
@@ -889,10 +924,20 @@ def generate_plot(n_epocs: int, n_neurons: int,
             u_ds = u_pred[::ds, ::ds, ::ds]
 
         grid_shape = x_ds.shape
-        voxels = np.ones(grid_shape, dtype=bool)
 
-        hole = (x_ds > 0.6) & (y_ds < 0.4) & (z_ds > 0.6)
-        voxels[hole] = False
+        # if we have a sphere we want to only see it
+        # so the condition for voxels is different
+        if mode != 'sphere':
+            voxels = np.ones(grid_shape, dtype=bool)
+            hole = (x_ds > 0.6) & (y_ds < 0.4) & (z_ds > 0.6)
+            voxels[hole] = False
+        else:
+            if mode == 'sphere':
+                if dim == 2:
+                    r_squared_ds = x_ds**2 + y_ds**2
+                else:  # dim == 3
+                    r_squared_ds = x_ds**2 + y_ds**2 + z_ds**2
+                voxels = r_squared_ds <= 1.0
 
         norm_pred = plt.Normalize(u_ds.min(), u_ds.max())
         colors = cm.viridis(norm_pred(u_ds))
