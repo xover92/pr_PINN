@@ -299,6 +299,24 @@ def test_lhs_sphere_shape_and_properties():
         assert torch.allclose(radius, torch.ones_like(radius))  # nosec B101
 
 
+def test_lhs__in_sphere_shape_and_properties():
+    for dim in [2, 3]:
+        points = prp.lhs_sample_generator_sphere_inside(100, dim)
+        assert len(points) == dim+1  # nosec B101
+        radius = 0
+        for point in points:
+            assert point.shape == (100, 1)  # nosec B101
+            assert point.requires_grad is True  # nosec B101
+            assert torch.all(point <= 1) and torch.all(
+                point >= -1)  # nosec B101
+        for point in points[:-1]:
+            radius += point**2
+
+        assert torch.all(points[-1] >= 0.0)  # nosec B101
+        assert torch.all(radius <= 1.0)  # nosec B101
+        assert torch.all(radius >= 0.0)  # nosec B101
+
+
 test_cases_sphere2d = [(x, y, t, (2*x**2+2*y**2)**2)
                        for x, y, t in itertools.product(x_vals,
                                                         y_vals, t_vals)]
