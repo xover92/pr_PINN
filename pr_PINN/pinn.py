@@ -145,6 +145,108 @@ def pde_residual(*coordinates: torch.Tensor,
     return residual
 
 
+def pde_residual_benchmark(r: torch.Tensor,
+                           t: torch.Tensor, model: nn.Module,  d: int,
+                           D: float = 0.01, R: float = 1) -> torch.Tensor:
+    """
+    Calculates the residual of the KPP-Fisher equation, simplified for
+    radially symmetrical conditions.
+
+    Parameters
+    ----------
+        *coordinates:torch.Tensor
+            The spatial coordinates (0<dim<4).
+        t:torch.Tensor
+            The temporal coordinates
+        model: nn.Module
+            The PINN
+        D:float=0.01
+            The diffusion coefficient
+        d: int
+            The d coefficient for the equation. Same as dim.
+        R:float=1
+            The reaction rate
+
+    Returns
+    -------
+        residual:torch.Tensor
+            The residual of the KPP-Fisher equation
+    """
+
+    u = model(r, t=t)
+
+    # temporal derivative
+    du_dt = torch.autograd.grad(u, t, torch.ones_like(
+        u), create_graph=True)[0]
+
+    # first derivative
+    du_dr = torch.autograd.grad(
+        u, r, create_graph=True, grad_outputs=torch.ones_like(u))[0]
+    # second derivative
+    d2u_dr2 = torch.autograd.grad(
+        du_dr, r, create_graph=True,
+        grad_outputs=torch.ones_like(du_dr))[0]
+
+    # kpp-fisher residual
+    residual = du_dt-D*(d2u_dr2+(d-1)*torch.pow(r, -1)*du_dr)-R*u*(1-u)
+    return residual
+
+
+def loss_function_sphere_benchmark(r: torch.Tensor,
+                                   t: torch.Tensor,
+                                   model: nn.Module, d: int,
+                                   value_t0: float = 0.0) -> float:
+    """
+    Calculates the loss for the PINN in the case of a radially symmetrical
+    initial condition.
+
+    Parameters
+    ----------
+        r:torch.Tensor
+            The radial coordinate.
+        t:torch.Tensor
+            The temporal coordinates
+        model: nn.Module
+            The PINN
+        D:float=0.01
+            The diffusion coefficient
+        d: int
+            The d coefficient for the equation. Same as dim.
+        R:float=1
+            The reaction rate
+
+    Returns
+    -------
+        loss: float
+            The total loss
+    """
+    # initial condition loss
+    u_pr = model(r, t=torch.zeros_like(t))
+    u_ex = torch.full_like(t, value_t0)
+    loss_ic = torch.mean((u_pr-u_ex)**2)
+
+    # boundary conditions loss
+    r_0 = torch.zeros_like(r, requires_grad=True)
+    r_1 = torch.ones_like(r, requires_grad=True)
+    u_pr_0 = model(r_0, t=t)
+    u_pr_1 = model(r_1, t=t)
+    du_dr_0 = torch.autograd.grad(
+        u_pr_0, r_0, create_graph=True,
+        grad_outputs=torch.ones_like(u_pr))[0]
+    du_dr_1 = torch.autograd.grad(
+        u_pr_1, r_1, create_graph=True,
+        grad_outputs=torch.ones_like(u_pr))[0]
+    loss_bc = torch.mean(du_dr_0**2)+torch.mean(du_dr_1**2)
+
+    # residual loss
+    loss_pde = torch.mean(pde_residual_benchmark(r, t=t, model=model, d=d)**2)
+
+    # total loss
+    loss = loss_bc+loss_ic+loss_pde
+
+    return loss
+
+
 def neumann_condition(*coordinates: torch.Tensor,
                       t: torch.Tensor, model: nn.Module) -> float:
     """
@@ -607,6 +709,56 @@ def training_loop(n_epochs: int, n_neurons: int,
     return model, loss_list
 
 
+def training_loop_benchmarking(n_epochs: int, n_neurons: int,
+                               n_points: int, dim: int,
+                               value_t0: float) -> tuple[nn.Module, list]:
+    """
+    Runs n_epochs loops to train the model for the symmatrical case.
+
+    Parameters
+    ----------
+        n_epochs:int
+            The number of epochs for the training loop.
+        n_neurons:int
+            The numer of neurons per layer.
+        n_points:int
+            The number of points for LHS sampling.
+        dim:int
+            The spatial dimensions.
+        value_t0: float
+            The initial condition
+
+    Returns
+    -------
+        model:nn.Module
+            The trained PINN.
+    """
+    model = PINN(n_neurons, 1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    # reinitialize the model parameters
+    model.apply(lambda m: m.reset_parameters()
+                if hasattr(m, 'reset_parameters') else None)
+
+    # sample point generation
+    all_samples = list(lhs_sample_generator(n_points, 2))
+
+    r = all_samples[0]
+    t = all_samples[1]
+
+    for epoch in range(n_epochs):
+        model.train()
+        loss = loss_function_sphere_benchmark(
+            r, t=t, model=model, value_t0=value_t0, d=dim)
+
+        # backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    return model
+
+
 def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
                     value_y0: float, value_y1: float, value_z0: float,
                     value_z1: float,
@@ -713,6 +865,56 @@ def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
     return history
 
 
+def l2_loss_sphere(n_points: int, model: nn.Module,
+                   benchmarking_model: nn.Module, dim: int) -> str:
+    """
+    Calculates the l2 loss between the PINN trained on cartesian coordinates
+    and the one on the symmatrical equation.
+
+    Parameters
+    ----------
+        n_point: int
+            The number of sampling points
+        model: nn.Module
+            The PINN trained on cartesian coordinates
+        benchmarking_model: nn.Module
+            The Pinn trained on the simple one dimensional equation
+        dim: int
+            The number of spatial dimensions
+
+    Returns
+    -------
+        l2_loss_text: str
+        A string containing the l2 loss and the maximum
+        difference between the models
+    """
+    # sample some points then calculate thei rradius
+    if dim == 2:
+        x_l2, y_l2, t_l2 = lhs_sample_generator_sphere_inside(n_points, 2)
+        radius_l2 = torch.sqrt(x_l2**2 + y_l2**2).detach()
+    else:
+        x_l2, y_l2, z_l2, t_l2 = lhs_sample_generator_sphere_inside(
+            n_points, 3)
+        radius_l2 = torch.sqrt(x_l2**2 + y_l2**2 + z_l2**2).detach()
+
+    # compute the trained models' outputs
+    with torch.no_grad():
+        u_cartesian_l2 = model(x_l2, y_l2, t=t_l2) if dim == 2 \
+            else model(x_l2, y_l2, z_l2, t=t_l2)
+        u_radial_l2 = benchmarking_model(radius_l2, t=t_l2)
+
+    # calculate the maximum difference
+    diff = u_cartesian_l2 - u_radial_l2
+    max_diff = torch.max(torch.abs(diff))
+
+    # calculate l2 loss
+    l2_loss = nn.functional.mse_loss(u_cartesian_l2, u_radial_l2)
+
+    l2_loss_text = f'L2 loss = {l2_loss}, maximum difference = {max_diff}'
+
+    return l2_loss_text
+
+
 def generate_plot(n_epocs: int, n_neurons: int,
                   n_points: int, dim: int, mode: str, value_x0,
                   value_x1, value_y0, value_y1,
@@ -780,6 +982,9 @@ def generate_plot(n_epocs: int, n_neurons: int,
         n_epocs, n_neurons, n_points, dim, mode, value_x0,
         value_x1, value_y0, value_y1,
         value_z0, value_z1, value_t0)
+    if mode == 'sphere':
+        benchmarking_model = training_loop_benchmarking(
+            n_epocs, n_neurons, n_points, dim, value_t0)
     history = solve_with_fipy(dim, mode, value_x0,
                               value_x1, value_y0, value_y1,
                               value_z0, value_z1, value_t0)
@@ -796,6 +1001,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
         x_test = torch.linspace(-1, 1, 20).view(-1, 1)
         y_test = torch.linspace(-1, 1, 20).view(-1, 1)
         z_test = torch.linspace(-1, 1, 20).view(-1, 1)
+        # r for benchmaring
+        r_bench = torch.linspace(0, 1, 20).view(-1, 1)
 
     # runs different meshgrids and operations for differents dims
     # namely dim=3 needs a different set of points to calculate the loss since
@@ -961,10 +1168,8 @@ def generate_plot(n_epocs: int, n_neurons: int,
         fig = plt.figure(figsize=(16, 5))
 
         # voxel plot of the prediction
-        if mode != 'sphere':
-            ax1 = fig.add_subplot(1, 3, 1, projection='3d')
-        else:
-            ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+        ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+
         ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
         ax1.set_title("Prediction (PINN)")
 
@@ -974,12 +1179,41 @@ def generate_plot(n_epocs: int, n_neurons: int,
             ax_exact.voxels(voxels, facecolors=colors_exact,
                             edgecolor='k', linewidth=0.2)
             ax_exact.set_title("Exact (FiPy)")
+        else:
+
+            ax_r = fig.add_subplot(1, 3, 2)
+
+            t_values = (0.0, 0.25, 0.5, 0.75, 1.0)
+            colors = cm.viridis(np.linspace(0, 1, len(t_values)))
+
+            for t_val, color in zip(t_values, colors):
+                with torch.no_grad():
+                    t_fixed = torch.full_like(r_bench, t_val)
+                    u_radial = benchmarking_model(
+                        r_bench, t=t_fixed).numpy().flatten()
+                    if dim == 2:
+                        # (x, 0) for simplicity
+                        u_cart_ray = model(r_bench, torch.zeros_like(
+                            r_bench), t=t_fixed).numpy().flatten()
+                    else:
+                        # (x, 0, 0) for simplicity
+                        u_cart_ray = model(r_bench, torch.zeros_like(r_bench),
+                                           torch.zeros_like(r_bench),
+                                           t=t_fixed).numpy().flatten()
+
+                ax_r.plot(r_bench.numpy().flatten(), u_cart_ray,
+                          color=color, label=f'Cartesian t={t_val}')
+                ax_r.plot(r_bench.numpy().flatten(),
+                          u_radial, '--', color=color,
+                          label=f'Radial t={t_val}')
+
+            ax_r.set_xlabel('r')
+            ax_r.set_ylabel('u(r, t)')
+            ax_r.legend()
+            ax_r.grid(True)
 
         # plot of the loss
-        if mode != 'sphere':
-            ax2 = fig.add_subplot(1, 3, 3)
-        else:
-            ax2 = fig.add_subplot(1, 2, 2)
+        ax2 = fig.add_subplot(1, 3, 3)
         ax2.plot(epochs, losses, label="loss")
         ax2.set_yscale('log')
         ax2.set_xlabel('epoch')
@@ -993,6 +1227,7 @@ def generate_plot(n_epocs: int, n_neurons: int,
 
             l2_loss_text = f'L2 loss={l2_loss}'
         else:
-            l2_loss_text = 'No way to calculate L2 loss for mode sphere'
+            l2_loss_text = l2_loss_sphere(
+                n_points, model, benchmarking_model, dim)
 
     return fig, l2_loss_text
