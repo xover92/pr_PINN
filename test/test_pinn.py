@@ -6,17 +6,22 @@ import pr_PINN.pinn as prp
 import itertools
 
 # lhs_sample_generator: shape checking
-# lhs for sphere: shape and value check
+# lhs for in sphere: shape and value check
+# lhs for boundary sphere: shape and value check
 # pde_residual: tested
+# pde benchmark: done for r!=0
 # neumann_condition: tested
 # neumann for sphere: tested
 # dirichlet_condition: tested
 # loss_function: tested in 1d by itself and in other dimensions
 #                by dependencies
+# loss benchmark: tested the only dependency
 # loss for sphere: tested dependencies
 # exact_solution_1d: tested
 # training_loop: tested by dependencies
+# training benchmark: tested dependencies
 # solve with fipy: not tested (depends on native funcs)
+# l2 sphere: tested indirectly
 # generate_plot: tested dependencies, done branching test
 #  (also done sphere part)
 
@@ -114,6 +119,21 @@ def test_pde_residual_3d(quad_dummy_model, x_res, y_res, z_res,
 
 test_cases_exact_sol = [(x, t, (1+math.exp((0.06**-0.5)*x-5*t/6))**-2)
                         for x, t in itertools.product(x_vals, t_vals)]
+
+test_cases_pde_sphere = [
+    (r, t, 1-0.01*(2+2)-(r**2+t)*(1-r**2-t))
+    for r, t in itertools.product(x_vals, t_vals) if r != 0
+]
+
+
+@pytest.mark.parametrize("r_res, t_res, exp_res", test_cases_pde_sphere)
+def test_pde_residual_sphere(quad_dummy_model, r_res, t_res, exp_res):
+
+    r = torch.tensor([[r_res]], requires_grad=True)
+    t = torch.tensor([[t_res]], requires_grad=True)
+    residual = prp.pde_residual_benchmark(
+        r, t=t, model=quad_dummy_model(1), d=2)
+    assert residual.isclose(torch.tensor([[exp_res]]))  # nosec B101
 
 
 @pytest.mark.parametrize("x_val, t_val, expected", test_cases_exact_sol)
@@ -382,3 +402,9 @@ def test_generate_plot_sphere():
     for dim in [2, 3]:
         fig, l2_loss_text = prp.generate_plot(
             2, 2, 25, dim, 'sphere', 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+        l2_value = float((l2_loss_text.split('=')[1]).split(',')[0])
+        max_difference = float(l2_loss_text.split('=')[2])
+        assert not math.isnan(l2_value)  # nosec B101
+        assert l2_value >= 0  # nosec B101
+        assert not math.isnan(max_difference)  # nosec B101
+        assert max_difference >= 0  # nosec B101
