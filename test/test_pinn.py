@@ -297,7 +297,7 @@ def test_loss_dirichlet_3d(x_val, y_val, z_val, t_val, x0, x1,
 def test_lhs_sample_shape_and_properties():
     for dim in [1, 2, 3]:
         points = prp.lhs_sample_generator(100, dim)
-        assert len(points) == dim  # nosec B101
+        assert len(points) == dim+1  # nosec B101
         for point in points:
             assert point.shape == (100, 1)  # nosec B101
             assert point.requires_grad is True  # nosec B101
