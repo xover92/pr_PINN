@@ -51,19 +51,31 @@ In this section, I will overview some basic PDE-related and ML concepts, and int
 
 ### The KPP-Fisher equation
 
-A reaction-diffusion equation is a partial differential equation (PDE) that equates the temporal derivative to the sum between the laplacian of a function $u(\vec{x}, t)$, and another function of that same $u(\vec{x}, t)$, named $f(u)$, both multiplied by coefficients as such:
-$$\frac{\delta u(\vec{x}, t)}{\delta t}=D\nabla^2u(\vec{x}, t)+Rf(u(\vec{x}, t))$$
+A reaction-diffusion equation is a partial differential equation (PDE) that equates the temporal derivative to the sum between the laplacian of a function $u\left(\vec{x}, t\right)$, and another function of that same $u\left(\vec{x}, t\right)$, named $f\left(u\right)$, both multiplied by coefficients as such:
+
+$$
+\frac{\delta u\left(\vec{x}, t\right)}{\delta t}=D\nabla^2u\left(\vec{x}, t\right)+Rf\left(u\left(\vec{x}, t\right)\right)
+$$
+
 Where D is the diffusion coefficient and R is the reaction coefficient. [2]
 
 One of the simplest nonlinear reaction-diffusions equations is given by the KPP-Fisher equation, whose name comes from the fact that it was first studied indipendently by a group consisting of Andrey Kolmogorov, Ivan Petrovsky and Nikolai Piskunov (hence KPP) and by Ronald Fisher, by himself, and then published in 1937. Remarkably, the former were studying it in general for reaction-diffusion systems in 2D, while the latter was studying a more precise equation in 1D applied on the diffusion of species [3]. This should hint at the veratility of such an equation, which commonly takes the form of:
-$$\frac{\delta u(\vec{x}, t)}{\delta t}=D\nabla^2u(\vec{x}, t)+Ru(1-u)$$
+
+$$
+\frac{\delta u\left(\vec{x}, t\right)}{\delta t}=D\nabla^2u\left(\vec{x}, t\right)+Ru\left(1-u\right)
+$$
 
 As it happens oftentimes with PDEs, finding an analytical solution is hardly possible. One remarkable result comes by Ablowitz and Zeppetella [1], which found an exact solution for a given traveling wave speed of $\pm\frac{5}{\sqrt{6}}$ in 1D, namely:
-$$u(x, t)=(1+e^{\sqrt{\frac{R}{6D}}x-\frac{5Rt}{6}})^{-2}$$
+
+$$
+u\left(x, t\right)=\left(1+e^{\sqrt{\frac{R}{6D}}x-\frac{5Rt}{6}}\right)^{-2}
+$$
 
 ### Physics Informed Neural Networks (PINNs)
 
 As the the reader may be aware of, neural networks are computational models isnpired from, as the name suggests, biological neural networks. Neural networks have been proven greatly for many tasks, one of them being function approximations. As with most ML techniques, the whole idea is based on the loss function, which is a function that encodes, for the machine, its objective: the goal of the machine is to tune its parameters in order to minimize the loss function. In the case of NNs, the parameters are the weights connecting the "neurons", plus a bias for each neuron. Apart from the inputs, neurons are values determined by the som of the value of the preceding neurons multiplied by the corresponding weights, plus a bias, passed through an activation function. [4]
+
+
 <a>
   <div class="image">
     <img src="https://upload.wikimedia.org/wikipedia/commons/c/c6/Artificial_neuron_structure.svg" width="490" height="230">
@@ -77,6 +89,7 @@ As the the reader may be aware of, neural networks are computational models isnp
     <figcaption>Schematic representation of a NN.</figcaption>
   </div>
 </a>
+
 
 Physics Informed Neural Networks (PINNs) are a somewhat special king of NN. Their main characteristic, as suggested by the name, is that their loss function encapsulates a physical law. This was made possible fairly recently (2019) thanks to leaps forward in the area of automatic differentiation. The basic idea is that the loss function could contain the residual of a PDE as a loss term, and as such the machine could be "informed" of the physics behind the system, and, by making use of the well known ability of deep neural networks as universal function approximators [5], find an approximate solution.
 
