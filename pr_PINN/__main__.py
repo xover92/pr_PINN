@@ -16,7 +16,7 @@ demo = gr.Interface(
     inputs=[gr.Slider(maximum=10000), gr.Slider(),
             gr.Slider(maximum=100000),
             gr.Slider(minimum=1, maximum=3, step=1.0),
-            gr.Radio(choices=['dirichlet', 'neumann', 'sphere']),
+            gr.Radio(choices=['exact', 'dirichlet', 'neumann', 'sphere']),
             gr.Slider(minimum=0.0, maximum=1.0, step=0.01),
             gr.Slider(minimum=0.0, maximum=1.0, step=0.01),
             gr.Slider(minimum=0.0, maximum=1.0, step=0.01),

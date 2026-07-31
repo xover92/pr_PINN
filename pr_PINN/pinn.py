@@ -989,6 +989,9 @@ def generate_plot(n_epocs: int, n_neurons: int,
 
     if mode == 'sphere' and dim == 1:
         raise NameError('Mode sphere only works with dim!=1')
+    if mode == 'exact' and dim != 1:
+        raise NameError('Mode sphere only works with dim==1')
+
     # collect the two solutions
     model, loss_list = training_loop(
         n_epocs, n_neurons, n_points, dim, mode, value_x0,
@@ -1041,8 +1044,9 @@ def generate_plot(n_epocs: int, n_neurons: int,
         if dim == 1:
             u_pred_tensor = model(x_test, t=t_test)
             u_pred = u_pred_tensor.numpy()
-            u_exact_tensor = exact_solution_1D(x_test, t_test)
-            u_exact = u_exact_tensor.numpy()
+            if mode == 'exact':
+                u_exact_tensor = exact_solution_1D(x_test, t_test)
+                u_exact = u_exact_tensor.numpy()
 
         if dim == 2:
             u_pred_tensor = model(x_test, y_test, t=t_test)
@@ -1062,19 +1066,24 @@ def generate_plot(n_epocs: int, n_neurons: int,
         x_test = x_test.numpy().reshape(20, 20)
         t_test = t_test.numpy().reshape(20, 20)
         u_pred = u_pred.reshape(20, 20)
-        u_exact = u_exact.reshape(20, 20)
+        if mode == 'exact':
+            u_exact = u_exact.reshape(20, 20)
 
         fipy_matrices = [item[0] if isinstance(
             item, (tuple, list)) else item for item in history]
         u_fipy = np.stack(fipy_matrices, axis=-1)
-        u_exact_tensor = torch.Tensor(u_fipy).reshape(-1, 1)
-        u_fipy = u_fipy.reshape(20, 20)
+        if mode != 'exact':
+            u_exact_tensor = torch.Tensor(u_fipy).reshape(-1, 1)
+            u_fipy = u_fipy.reshape(20, 20)
 
         # contour plots
         c1 = ax1.contourf(x_test, t_test, u_pred, levels=250, cmap='jet')
         ax1.set_title('Prediction (PINN)')
         fig.colorbar(c1, ax=ax1)
-        c2 = ax2.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
+        if mode != "exact":
+            c2 = ax2.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
+        else:
+            c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
         ax2.set_title('fipy')
         fig.colorbar(c2, ax=ax2)
 
