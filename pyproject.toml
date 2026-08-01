@@ -1,6 +1,6 @@
 [project]
 name = 'pr_PINN'
-version = '0.2.4'
+version = '0.2.5'
 authors = [
   { name='Francesco Colombo', email='francesco.colombo10@studio.unibo.it' },
 ]

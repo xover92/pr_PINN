@@ -1120,6 +1120,17 @@ def generate_plot(n_epocs: int, n_neurons: int,
                       ::ds] if dim == 3 else t_test[::ds, ::ds, ::ds]
         u_ds = u_pred[::ds, ::ds, ::ds]
 
+        # create the points for the voxel plot
+        # to rescale the axes
+        n = 20
+
+        x_edges = np.linspace(x_ds.min(), x_ds.max(), n + 1)
+        y_edges = np.linspace(y_ds.min(), y_ds.max(), n + 1)
+        z_edges = np.linspace(z_ds.min(), z_ds.max(), n + 1) if dim == 3 else \
+            np.linspace(t_test.min(), t_test.max(), n + 1)
+
+        X, Y, Z = np.meshgrid(x_edges, y_edges, z_edges, indexing='ij')
+
         grid_shape = x_ds.shape
 
         # if we have a sphere we want to only see it
@@ -1159,13 +1170,14 @@ def generate_plot(n_epocs: int, n_neurons: int,
         # voxel plot of the prediction
         ax1 = fig.add_subplot(1, 3, 1, projection='3d')
 
-        ax1.voxels(voxels, facecolors=colors, edgecolor='k', linewidth=0.2)
+        ax1.voxels(X, Y, Z, voxels, facecolors=colors,
+                   edgecolor='k', linewidth=0.2)
         ax1.set_title("Prediction (PINN)")
 
         if mode != 'sphere':
             # voxel plot of the fipy solution
             ax_exact = fig.add_subplot(1, 3, 2, projection='3d')
-            ax_exact.voxels(voxels, facecolors=colors_exact,
+            ax_exact.voxels(X, Y, Z, voxels, facecolors=colors_exact,
                             edgecolor='k', linewidth=0.2)
             ax_exact.set_title("Exact (FiPy)")
         else:
