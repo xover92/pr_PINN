@@ -208,6 +208,18 @@ The project's testing was written using pytest, and as such the command line com
 ```bash
 $ python -m pytest -v ./test/
 ```
+
+### Testing approach
+
+The main function, which is generate_plot, is tested only with a branching test and a check of the non-negativity of L2 and, eventually, the maximum difference. This ensures that, in general, the program runs at least without error. As for the functions called inside the aforementioned, various approaches were adopted depending on the function.
+
+For the sampling functions, the tests ensure that their shape is correct and that their values are coherent with the geometry of the system. 
+In the cases of the loss functions, two techniques were employed:
+* In the case of the exact mode loss function, I employed oracle testing, by using the exact solution as the input model and verifying that in such case the loss would be 0;
+* in all the other cases, the loss functions themselves were not tested, but the functions they depended on were, on a simple quadratic model: by using itertools, I was able to explicitate the expected functions for the boundaries or for the PDE and consequently to see if the functions that consituted the loss where calculating, in such an easy model, the correct values.
+
+The exact solution was trivially tested by checking whether the values were as predicted, while solve_with_fipy was not tested since it only depends on fiPy methods, and if the shape were incorrect the program would produce other errors, checked by the aforementioned branching test for generate_plot.
+
 ## Contribution
 
 No contribution is allowed, since this is a project meant for university.
