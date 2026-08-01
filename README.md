@@ -67,13 +67,22 @@ $$
 
 As it happens oftentimes with PDEs, finding an analytical solution is hardly possible. One remarkable result comes by Ablowitz and Zeppetella [1], which found an exact solution for a given traveling wave speed of $\pm\frac{5}{\sqrt{6}}$ in 1D, namely:
 
+<a id="eq:zepp"></a>
 $$
 u\left(x, t\right)=\left(1+e^{\sqrt{\frac{R}{6D}}x-\frac{5Rt}{6}}\right)^{-2}
 $$
 
+In the case of a sphere or a cicle, and radially symmetrical initial and boundary conditions, the Fisher-KPP equation simplifies as:
+
+<a id="eq:radial"></a>
+$$
+\frac{\delta u}{\delta t}=D(\frac{\delta^2u}{\delta r^2}+\frac{d-1}{r}\frac{\delta u}{\delta r})+Ru(1-u)
+$$
+
+where d is equal to the number of spatial dimensions (i.e. 2 for the circle, 3 for the sphere). [7]
 ### Physics Informed Neural Networks (PINNs)
 
-As the the reader may be aware of, neural networks are computational models isnpired from, as the name suggests, biological neural networks. Neural networks have been proven greatly for many tasks, one of them being function approximations. As with most ML techniques, the whole idea is based on the loss function, which is a function that encodes, for the machine, its objective: the goal of the machine is to tune its parameters in order to minimize the loss function. In the case of NNs, the parameters are the weights connecting the "neurons", plus a bias for each neuron. Apart from the inputs, neurons are values determined by the som of the value of the preceding neurons multiplied by the corresponding weights, plus a bias, passed through an activation function. [4]
+As the reader may be aware of, neural networks are computational models inspired from, as the name suggests, biological neural networks. Neural networks have been proven greatly for many tasks, one of them being function approximations. As with most ML techniques, the whole idea is based on the loss function, which is a function that encodes, for the machine, its objective: the goal of the machine is to tune its parameters in order to minimize the loss function. In the case of NNs, the parameters are the weights connecting the "neurons", plus a bias for each neuron. Apart from the inputs, neurons are values determined by the some of the value of the preceding neurons multiplied by the corresponding weights, plus a bias, passed through an activation function. [4]
 
 
 <a>
@@ -97,7 +106,44 @@ There are two ways in which a PINN may be used: forward and inverse problems. Fo
 
 ## Program architecture
 
-**TODO**
+In this section, I will explain the basic architecture of the code. I will avoid going in great implementation detail, but the reader may read the documentation at https://pr-pinn.readthedocs.io/en/latest/API/pr_PINN.html for more precise information. 
+
+The program is equipped with an interface powered by Gradio. It provides, by using gradio.Interface, an easy way for the user to decide their inputs. 
+
+Because of the necessities of gradio.Interface in terms of inputs and outputs, the main script is encapsulated in a function called generate_plot. The aforementioned links together the other functions, providing, with a simple series of ifs, the proper unfolding of functions based on the requested problems. As a matter of fact, the program can solve the following problems:
+* **mode "exact"**: solves, in 1D, the problem with boundary and initials condition given by the solution by [eq. 1](#eq:zepp);
+* **mode "dirichlet"**: solves, in 1,2 and 3D the KPP-Fisher in the space [0, 1]^dim from time 0 to 1, with given (by the user) initial and boundary Dirichlet conditions;
+* **mode "neumann"**: solves, in 1,2 and 3D the KPP-Fisher in the space [0, 1]^dim from time 0 to 1, with given (by the user) initial and boundary Neumann conditions (null flux);
+* **mode "sphere"**: solves, in 2 and 3D the equation in the unit sphere with given initial conditions and with Neumann Boundary Condition.
+
+In the first case, benchmarking is done by comparing the result to that given by the precise solution.
+In the second and third case, benchmarking is done by comparing the result with that obtained, giving the same conditions, by fiPy, a finite volume PDE solver. 
+As for the circle or the sphere, the PINN solves the problem in 2 or 3D and compares it with that obtained by the PINN itself in the simpler problems in 1D given by [eq.2](#eq:radial).
+
+The basic architecture works as follows:
+1. The mode is selected:
+    * if the mode is not "exact", you select the boundary conditions and the dimension.
+2. You select the number of sampling points, of epochs and of neurons per layer;
+3. The program generates the PINN and the sampling points (more on that in the following subsection);
+4. The program runs the number of epochs selected by computing the loss functions for the sampling points, and uses it to train the PINN;
+5. Once the PINN is trained, 20^dim+1 testing points are generated;
+6. The PINN is calculated on those points as well as the specific benchmarking model;
+7. L2 loss is evaluated:
+    * if the mode is "sphere", the maximum difference between the two estimates is also calculated. 
+
+The data is generated and passed to the PINN as a series of torch.Tensors, one per dimension. For example, if you generated three points in 3D, you would get four Tensors of length three each. They are eventually reshaped for plotting purposes.
+
+One implementative detail that shall be covered more thoroughly is that of the generation of sampling points, in particular that of boundary points.
+
+### Point sampling
+
+Point sampling is done by employing Latin Hypercube Sampling, LHS in short. This method employs a quasi-random distribution of points that, in short, divides the space in a number of evenly large intervals equal to that of the points to generate, and then selects randomly one point per interval. For example, if you had to generate two points in 1D, it would generate two random points, one in $\left[0, 0.5\right)$ and in $\left[0.5, 1\right)$. (obviously, if the number of points is lower than d you cannot actually "cover" all the space)
+
+The method was employed to generate all the point for training, with some distinctions between the $\left[0,1\right]^{dim+1}$ space and the spherical one used for the "sphere" mode. 
+
+In the case of the $\left[0,1\right]^{dim+1}$ space, the points were first generated inside the boundaries, then projected to them: that means that, for example, if you generated four points in 1D (we will cal each $\left(x_i; t_i\right)$), at the end you would actually have trained the PINN on 20 points: $\left(x_i; 0\right)$, $\left(x_i; 1\right)$, $\left(0; t_i\right)$, $\left(1; t_i\right)$ and $\left(x_i; t_i\right)$ for $i \in \left(1, 2, 3, 4\right)$. 
+
+As for the spherical mode, the technique is different. First, the number of points selected by the user is generated inside the sphere/circle, by generating points with LHS with the requested dimensionality, rescaling them into polar coordinates and finally converting them into cartesian coordinates; a note: in the case of a sphere, the rescaling is not obvious as rescaling directly to an angle by multiplying, but it is done by employing arccos for spatial uniformity. Then, the same technique is employed for the boundaries, but by fixing the radius to 1 (which, operatively, means to generate points with one dimension less). As for the temporal boundaries, the technique is the same as for the other modes.
 
 ## Results
 
@@ -166,6 +212,8 @@ No contribution is allowed, since this is a project meant for university.
 <blockquote>4- Larry Hardesty, Explained: Neural Networks, MIT News, 2017, https://news.mit.edu/2017/explained-neural-networks-deep-learning-0414 </blockquote>
 <blockquote>5- M. Raissi, P. Perdikaris, G.E. Karniadakis, Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations, Journal of Computational Physics, Volume 378, 2019, Pages 686-707, ISSN 0021-9991, https://doi.org/10.1016/j.jcp.2018.10.045 </blockquote>
 <blockquote>6- Fan Yang, Hao Liu, Xiao-Xiao Li, Jian-Xiong Cao, PINN neural network method for solving the forward and inverse problem of time-fractional telegraph equation, Results in Engineering, Volume 25, 2025, 103997, ISSN 2590-1230, https://doi.org/10.1016/j.rineng.2025.103997</blockquote>
+<blockquote>7- Wim van Saarloos, Front propagation into unstable states, Physics Reports, Volume 386, Issues 2–6, 2003, Pages 29-222, ISSN 0370-1573, https://doi.org/10.1016/j.physrep.2003.08.001</blockquote>
+<blockquote>8- McKay, M. & Beckman, Richard & Conover, William. (1979). Comparison of Three Methods for Selecting Values of Input Variables in the Analysis of Output from a Computer Code. Technometrics. 21. 239-245. 10.1080/00401706.1979.10489755. </blockquote>
 
 ## Authors
 
