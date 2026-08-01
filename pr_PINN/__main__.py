@@ -3,7 +3,7 @@
 
 import torch
 import gradio as gr
-import pr_PINN.pinn as pinn
+from . import pinn
 
 __author__ = ['Francesco Colombo']
 __email__ = ['francesco.colombo10@studio.unibo.it']
