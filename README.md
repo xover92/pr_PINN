@@ -151,6 +151,14 @@ As for the spherical mode, the technique is different. First, the number of poin
 
 ## Future developments
 
+In this section, I will cover the possible future developments of the program, divided into two subsections. One is in regard to the interface, which could use an update. The other will cover, instead, one possible application in medicine.
+
+### Interface
+
+The program at the moment uses an interface provided by Gradio, namely a gradio.Interface. This type of interface does not update dynamically, and as such the user may, at all times and for all modes, select also parameters that the model does not actually need. For example, in "exact" mode, the user does not need to provide any initial or boundary condition, but the interface still gives them this possibility. The program still runs normally, but this can be avoided by using Gradio Blocks, which do actually update dynamically, and would provide a much better interface for the means of the program.
+
+### Personalized predictions of Glioblastoma infiltration
+
 **TODO**
 
 ## Prerequisites
