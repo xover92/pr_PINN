@@ -68,6 +68,7 @@ $$
 As it happens oftentimes with PDEs, finding an analytical solution is hardly possible. One remarkable result comes by Ablowitz and Zeppetella [1], which found an exact solution for a given traveling wave speed of $\pm\frac{5}{\sqrt{6}}$ in 1D, namely:
 
 <a id="eq:zepp"></a>
+
 $$
 u\left(x, t\right)=\left(1+e^{\sqrt{\frac{R}{6D}}x-\frac{5Rt}{6}}\right)^{-2}
 $$
@@ -75,6 +76,7 @@ $$
 In the case of a sphere or a cicle, and radially symmetrical initial and boundary conditions, the Fisher-KPP equation simplifies as:
 
 <a id="eq:radial"></a>
+
 $$
 \frac{\delta u}{\delta t}=D(\frac{\delta^2u}{\delta r^2}+\frac{d-1}{r}\frac{\delta u}{\delta r})+Ru(1-u)
 $$
@@ -112,8 +114,8 @@ The program is equipped with an interface powered by Gradio. It provides, by usi
 
 Because of the necessities of gradio.Interface in terms of inputs and outputs, the main script is encapsulated in a function called generate_plot. The aforementioned links together the other functions, providing, with a simple series of ifs, the proper unfolding of functions based on the requested problems. As a matter of fact, the program can solve the following problems:
 * **mode "exact"**: solves, in 1D, the problem with boundary and initials condition given by the solution by [eq. 1](#eq:zepp);
-* **mode "dirichlet"**: solves, in 1,2 and 3D the KPP-Fisher in the space [0, 1]^dim from time 0 to 1, with given (by the user) initial and boundary Dirichlet conditions;
-* **mode "neumann"**: solves, in 1,2 and 3D the KPP-Fisher in the space [0, 1]^dim from time 0 to 1, with given (by the user) initial and boundary Neumann conditions (null flux);
+* **mode "dirichlet"**: solves, in 1,2 and 3D the KPP-Fisher in the space $[0, 1]^{dim}$ from time 0 to 1, with given (by the user) initial and boundary Dirichlet conditions;
+* **mode "neumann"**: solves, in 1,2 and 3D the KPP-Fisher in the space $[0, 1]^{dim}$ from time 0 to 1, with given (by the user) initial and boundary Neumann conditions (null flux);
 * **mode "sphere"**: solves, in 2 and 3D the equation in the unit sphere with given initial conditions and with Neumann Boundary Condition.
 
 In the first case, benchmarking is done by comparing the result to that given by the precise solution.
@@ -147,7 +149,22 @@ As for the spherical mode, the technique is different. First, the number of poin
 
 ## Results
 
-**TODO**
+In this section, I will report the numerical results obtained by running the program one single time with 2000 epochs, 4000 sampling points, 30 neurons and all boundary and initial conditions set to 0.1 (the former only when needed). I do not at the moment posses the computational power to do a more statistically sound investigation, although the program has proved, in my day-to-day use, quite stable in behavior.
+
+|Mode|Dimension|L2 loss|
+|----|---------|-------|
+|Exact| 1 | 5.14e-7|
+|Dirichlet| 1 | 2.10e-4|
+|Dirichlet| 2 | 4.35e-4|
+|Dirichlet| 3 | 2.15e-3|
+|Neumann| 1 | 2.87e-6|
+|Neumann| 2 | 2.86e-06|
+|Neumann| 3 | 2.94e-06|
+|Sphere| 2 |7.88e-07|
+|Sphere| 3 | 1.75e-07|
+
+The results for all modes are satisfactory but those of Dirichlet are remarkably worse. It must also be noted that Dirichlet may perform differently in the case in which the boundary conditions and the initial conditions "disagree" in the angle points, although that was predicted and the program seemes to behave correctly even in those cases, although again this should be tested more thoroughly with more computational power. 
+The stark difference is probably due to a difference in the task's difficulty, although one way to try and get better results could be to also train the loss weights.
 
 ## Future developments
 
