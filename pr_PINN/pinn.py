@@ -416,7 +416,9 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
         loss_bc = torch.mean((u_0_pr - u_0_ex)**2) + \
             torch.mean((u_1_ex-u_1_pr)**2)
     elif mode == 'dirichlet':
-        loss_bc = dirichlet_condition(*coordinates, t=t,
+        # to avoid disagreements in the angles
+        t_bc = 0.05 + (1 - 0.05) * t
+        loss_bc = dirichlet_condition(*coordinates, t=t_bc,
                                       model=model, value_x0=value_x0,
                                       value_x1=value_x1,
                                       value_y0=value_y0,
@@ -824,28 +826,28 @@ def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
 
     # set boundary conditions
     if mode == 'dirichlet':
-        if dim == 1:
+        if dim >= 1:
             phi.constrain(value_x0, where=mesh.facesLeft)
             phi.constrain(value_x1, where=mesh.facesRight)
 
-        if dim == 2:  # add conditions for dim==2
+        if dim >= 2:  # add conditions for dim==2
             phi.constrain(value_y0, where=mesh.facesBottom)
             phi.constrain(value_y1, where=mesh.facesTop)
 
-        if dim == 3:  # add conditions for dim=3
+        if dim >= 3:  # add conditions for dim=3
             phi.constrain(value_z0, where=mesh.facesFront)
             phi.constrain(value_z1, where=mesh.facesBack)
 
     elif mode == 'neumann':
-        if dim == 1:
+        if dim >= 1:
             phi.faceGrad.constrain(0.0, where=mesh.facesLeft)
             phi.faceGrad.constrain(0.0, where=mesh.facesRight)
 
-        if dim == 2:
+        if dim >= 2:
             phi.faceGrad.constrain(0.0, where=mesh.facesBottom)
             phi.faceGrad.constrain(0.0, where=mesh.facesTop)
 
-        if dim == 3:
+        if dim >= 3:
             phi.faceGrad.constrain(0.0, where=mesh.facesFront)
             phi.faceGrad.constrain(0.0, where=mesh.facesBack)
 
