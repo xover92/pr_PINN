@@ -39,11 +39,7 @@ This is a project developed for the Pattern recognition and Software&Computing c
 
 ## Overview
 
-This project, developed for the courses of Pattern Recognition and Software&computing for applied physics, consists of a PINN that solves the Fisher-KPP equation in 1D, 2D and 3D. The program is developed with user-friendliness in mind, and as such runs on gradio, which allows it to have a simple GUI.
-
-## Introduction
-
-**TODO**
+This project, developed for the courses of Pattern Recognition and Software&computing for applied physics, consists of a PINN that solves the Fisher-KPP equation in 1D, 2D and 3D.
 
 ## Theoretical overview
 
@@ -54,15 +50,15 @@ In this section, I will overview some basic PDE-related and ML concepts, and int
 A reaction-diffusion equation is a partial differential equation (PDE) that equates the temporal derivative to the sum between the laplacian of a function $u\left(\vec{x}, t\right)$, and another function of that same $u\left(\vec{x}, t\right)$, named $f\left(u\right)$, both multiplied by coefficients as such:
 
 $$
-\frac{\delta u\left(\vec{x}, t\right)}{\delta t}=D\nabla^2u\left(\vec{x}, t\right)+Rf\left(u\left(\vec{x}, t\right)\right)
+\frac{\partial u\left(\vec{x}, t\right)}{\partial t}=D\nabla^2u\left(\vec{x}, t\right)+Rf\left(u\left(\vec{x}, t\right)\right)
 $$
 
 Where D is the diffusion coefficient and R is the reaction coefficient. [2]
 
-One of the simplest nonlinear reaction-diffusions equations is given by the KPP-Fisher equation, whose name comes from the fact that it was first studied indipendently by a group consisting of Andrey Kolmogorov, Ivan Petrovsky and Nikolai Piskunov (hence KPP) and by Ronald Fisher, by himself, and then published in 1937. Remarkably, the former were studying it in general for reaction-diffusion systems in 2D, while the latter was studying a more precise equation in 1D applied on the diffusion of species [3]. This should hint at the veratility of such an equation, which commonly takes the form of:
+One of the simplest nonlinear reaction-diffusions equations is given by the KPP-Fisher equation, whose name comes from the fact that it was first studied independently by a group consisting of Andrey Kolmogorov, Ivan Petrovsky and Nikolai Piskunov (hence KPP) and by Ronald Fisher, by himself, and then published in 1937. Remarkably, the former were studying it in general for reaction-diffusion systems in 2D, while the latter was studying a more precise equation in 1D applied on the diffusion of species [3]. This should hint at the versatility of such an equation, which commonly takes the form of:
 
 $$
-\frac{\delta u\left(\vec{x}, t\right)}{\delta t}=D\nabla^2u\left(\vec{x}, t\right)+Ru\left(1-u\right)
+\frac{\partial u\left(\vec{x}, t\right)}{\partial t}=D\nabla^2u\left(\vec{x}, t\right)+Ru\left(1-u\right)
 $$
 
 As it happens oftentimes with PDEs, finding an analytical solution is hardly possible. One remarkable result comes by Ablowitz and Zeppetella [1], which found an exact solution for a given traveling wave speed of $\pm\frac{5}{\sqrt{6}}$ in 1D, namely:
@@ -73,36 +69,32 @@ $$
 u\left(x, t\right)=\left(1+e^{\sqrt{\frac{R}{6D}}x-\frac{5Rt}{6}}\right)^{-2}
 $$
 
-In the case of a sphere or a cicle, and radially symmetrical initial and boundary conditions, the Fisher-KPP equation simplifies as:
+In the case of a sphere or a circle, and radially symmetrical initial and boundary conditions, the Fisher-KPP equation simplifies as:
 
 <a id="eq:radial"></a>
 
 $$
-\frac{\delta u}{\delta t}=D(\frac{\delta^2u}{\delta r^2}+\frac{d-1}{r}\frac{\delta u}{\delta r})+Ru(1-u)
+\frac{\partial u}{\partial t}=D(\frac{\partial^2u}{\partial r^2}+\frac{d-1}{r}\frac{\partial u}{\partial r})+Ru(1-u)
 $$
 
 where d is equal to the number of spatial dimensions (i.e. 2 for the circle, 3 for the sphere). [7]
 ### Physics Informed Neural Networks (PINNs)
 
-As the reader may be aware of, neural networks are computational models inspired from, as the name suggests, biological neural networks. Neural networks have been proven greatly for many tasks, one of them being function approximations. As with most ML techniques, the whole idea is based on the loss function, which is a function that encodes, for the machine, its objective: the goal of the machine is to tune its parameters in order to minimize the loss function. In the case of NNs, the parameters are the weights connecting the "neurons", plus a bias for each neuron. Apart from the inputs, neurons are values determined by the some of the value of the preceding neurons multiplied by the corresponding weights, plus a bias, passed through an activation function. [4]
+As the reader may be aware of, neural networks are computational models inspired from, as the name suggests, biological neural networks. Neural networks have been proven greatly for many tasks, one of them being function approximations. As with most ML techniques, the whole idea is based on the loss function, which is a function that encodes, for the machine, its objective: the goal of the machine is to tune its parameters in order to minimize the loss function. In the case of NNs, the parameters are the weights connecting the "neurons", plus a bias for each neuron. Apart from the inputs, neurons are values determined by the sum of the value of the preceding neurons multiplied by the corresponding weights, plus a bias, passed through an activation function. [4]
 
 
-<a>
-  <div class="image">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c6/Artificial_neuron_structure.svg" width="490" height="230">
+  <figure align="center">
+    <img src="https://assets-global.website-files.com/5d7b77b063a9066d83e1209c/614fc05e2486109794ed3bdc_neuron.png" width="490" height="300">
     <figcaption>Functioning of a single neuron.</figcaption>
-  </div>
-</a>
+  </figure>
 
-<a>
-  <div class="image">
+
+  <figure align="center">
     <img src="https://www.codespeedy.com/wp-content/uploads/2019/05/ann.png" width="390" height="230">
     <figcaption>Schematic representation of a NN.</figcaption>
-  </div>
-</a>
+  </figure>
 
-
-Physics Informed Neural Networks (PINNs) are a somewhat special king of NN. Their main characteristic, as suggested by the name, is that their loss function encapsulates a physical law. This was made possible fairly recently (2019) thanks to leaps forward in the area of automatic differentiation. The basic idea is that the loss function could contain the residual of a PDE as a loss term, and as such the machine could be "informed" of the physics behind the system, and, by making use of the well known ability of deep neural networks as universal function approximators [5], find an approximate solution.
+Physics Informed Neural Networks (PINNs) are a somewhat special kind of NN. Their main characteristic, as suggested by the name, is that their loss function encapsulates a physical law. This was made possible fairly recently (2019) thanks to leaps forward in the area of automatic differentiation. The basic idea is that the loss function could contain the residual of a PDE as a loss term, and as such the machine could be "informed" of the physics behind the system, and, by making use of the well known ability of deep neural networks as universal function approximators [5], find an approximate solution.
 
 There are two ways in which a PINN may be used: forward and inverse problems. Forward problems are those in which the PDE is known, as the boundary and initial conditions. Inverse problems include inverting the model parameters and boundary conditions from data [6]. This project, for now, solves only direct problems.
 
@@ -149,34 +141,43 @@ As for the spherical mode, the technique is different. First, the number of poin
 
 ## Results
 
-In this section, I will report the numerical results obtained by running the program one single time with 2000 epochs, 4000 sampling points, 30 neurons and all boundary and initial conditions set to 0.1 (the former only when needed). I do not at the moment posses the computational power to do a more statistically sound investigation, although the program has proved, in my day-to-day use, quite stable in behavior.
+In this section, I will report the numerical results obtained by running the program one single time with 2000 epochs, 4000 sampling points, 30 neurons and all boundary and initial conditions set to 0.1 (the former only when needed). I do not at the moment possess the computational power to do a more statistically sound investigation, although the program has proved, in my day-to-day use, quite stable in behavior.
 
 |Mode|Dimension|L2 loss|
 |----|---------|-------|
-|Exact| 1 | 5.14e-7|
-|Dirichlet| 1 | 2.10e-4|
-|Dirichlet| 2 | 4.35e-4|
-|Dirichlet| 3 | 2.15e-3|
-|Neumann| 1 | 2.87e-6|
-|Neumann| 2 | 2.86e-06|
-|Neumann| 3 | 2.94e-06|
-|Sphere| 2 |7.88e-07|
-|Sphere| 3 | 1.75e-07|
+|Exact| 1 | 5.14e-07|
+|Dirichlet| 1 | 2.01e-4|
+|Dirichlet| 2 | 5.29e-4|
+|Dirichlet| 3 | 1.92e-3|
+|Neumann| 1 | 2.15e-6|
+|Neumann| 2 | 2.75e-06|
+|Neumann| 3 | 2.80e-06|
+|Sphere| 2 |1.08e-07|
+|Sphere| 3 | 1.46e-07|
 
-The results for all modes are satisfactory but those of Dirichlet are remarkably worse. It must also be noted that Dirichlet may perform differently in the case in which the boundary conditions and the initial conditions "disagree" in the angle points, although that was predicted and the program seemes to behave correctly even in those cases, although again this should be tested more thoroughly with more computational power. 
+The results for all modes are satisfactory but those of Dirichlet are remarkably worse. It must also be noted that Dirichlet may perform differently in the case in which the boundary conditions and the initial conditions "disagree" in the angle points, although that was predicted and the program seems to behave correctly even in those cases, although again this should be tested more thoroughly with more computational power. 
 The stark difference is probably due to a difference in the task's difficulty, although one way to try and get better results could be to also train the loss weights.
 
 ## Future developments
 
-In this section, I will cover the possible future developments of the program, divided into two subsections. One is in regard to the interface, which could use an update. The other will cover, instead, one possible application in medicine.
+In this section, I will cover the possible future developments of the program, divided into three subsections. One is in regard to the interface, which could use an update. The second one will briefly address the problems with Dirichlet conditions, while the third one will cover, instead, one possible application in medicine.
 
 ### Interface
 
 The program at the moment uses an interface provided by Gradio, namely a gradio.Interface. This type of interface does not update dynamically, and as such the user may, at all times and for all modes, select also parameters that the model does not actually need. For example, in "exact" mode, the user does not need to provide any initial or boundary condition, but the interface still gives them this possibility. The program still runs normally, but this can be avoided by using Gradio Blocks, which do actually update dynamically, and would provide a much better interface for the means of the program.
 
+### Dirichlet conditions
+
+As shown in the section about results, the PINN performs significantly worse in the case of Dirichlet boundary conditions. Although this is probably due to the increased difficulty of the task, it is likely that the results could be better. One possible solution could be to employ Self-Adaptive PINNs, which, by featuring a light attention mechanism allow the loss' weights to be trained as the hidden layers. [9]
+
 ### Personalized predictions of Glioblastoma infiltration
 
-**TODO**
+The KPP-Fisher equation, with Neumann boundary conditions, also governs the evolution of Glioblastoma, and as such its solution with PINNs has been explored in recent research. Initial conditions and brain geometry can be inferred by the combination of various techniques of medical imaging [12], although the author is not aware of a method to infer the normal vector to compute Neumann conditions (which likely comes down to the form of the data). Another critical problem is given by the fact that there is no way to infer the time t at which the data is acquired, although many rescaling solutions have been found [10] [11]. 
+
+The program developed here could find use in this field by following roughly the steps of [10], with some differences. They train the PINN to find the particular solution and then use it to find, by re-training the PINN with patient data, the general one, encoding the knowledge of the particular solution into the loss. This could be followed, as with their rescaling technique, although there is no reason not to try others, as the one suggested by Konkoglu et al. [11]. 
+The main difference would be in the space representation: they employ the Diffuse-domain method to compute the boundary conditions, while this project is made to work best on actual spatial coordinates: one solution could be, given the data about brain geometry and a way to find the normal vector, to compute it as is done for the rest of this project, which obtains great results in a circular or spherical setting, the most similar conditions from those of a brain found here. As for the inside points, one simple solution would be to still employ LHS, but to discard sampled points that get generated out of the interested region. 
+
+To sum up, the project would need many-touch ups to be adapted to such a problem, but due to the similarity of the problems it is not too far-fetched to theorize such a development.
 
 ## Prerequisites
 
@@ -216,7 +217,7 @@ In order to run it, type:
 ```bash
 $ python -m pr_PINN
 ```
-When ran, it will show a local link. By clicking on it, you will access the gradio GUI, where you will be able to use the program.
+When run, it will show a local link. By clicking on it, you will access the gradio GUI, where you will be able to use the program.
 ## Testing
 
 ### How to test
@@ -233,7 +234,7 @@ The main function, which is generate_plot, is tested only with a branching test 
 For the sampling functions, the tests ensure that their shape is correct and that their values are coherent with the geometry of the system. 
 In the cases of the loss functions, two techniques were employed:
 * In the case of the exact mode loss function, I employed oracle testing, by using the exact solution as the input model and verifying that in such case the loss would be 0;
-* in all the other cases, the loss functions themselves were not tested, but the functions they depended on were, on a simple quadratic model: by using itertools, I was able to explicitate the expected functions for the boundaries or for the PDE and consequently to see if the functions that consituted the loss where calculating, in such an easy model, the correct values.
+* in all the other cases, the loss functions themselves were not tested, but the functions they depended on were, on a simple quadratic model: by using itertools, I was able to explicitate the expected functions for the boundaries or for the PDE and consequently to see if the functions that constituted the loss where calculating, in such an easy model, the correct values.
 
 The exact solution was trivially tested by checking whether the values were as predicted, while solve_with_fipy was not tested since it only depends on fiPy methods, and if the shape were incorrect the program would produce other errors, checked by the aforementioned branching test for generate_plot.
 
@@ -251,6 +252,10 @@ No contribution is allowed, since this is a project meant for university.
 <blockquote>6- Fan Yang, Hao Liu, Xiao-Xiao Li, Jian-Xiong Cao, PINN neural network method for solving the forward and inverse problem of time-fractional telegraph equation, Results in Engineering, Volume 25, 2025, 103997, ISSN 2590-1230, https://doi.org/10.1016/j.rineng.2025.103997</blockquote>
 <blockquote>7- Wim van Saarloos, Front propagation into unstable states, Physics Reports, Volume 386, Issues 2–6, 2003, Pages 29-222, ISSN 0370-1573, https://doi.org/10.1016/j.physrep.2003.08.001</blockquote>
 <blockquote>8- McKay, M. & Beckman, Richard & Conover, William. (1979). Comparison of Three Methods for Selecting Values of Input Variables in the Analysis of Output from a Computer Code. Technometrics. 21. 239-245. 10.1080/00401706.1979.10489755. </blockquote>
+<blockquote>9- Levi D. McClenny, Ulisses M. Braga-Neto, Self-adaptive physics-informed neural networks, Journal of Computational Physics, Volume 474, 2023, 111722, ISSN 0021-9991, https://doi.org/10.1016/j.jcp.2022.111722.</blockquote>
+<blockquote>10- Ray Zirui Zhang, Ivan Ezhov, Michal Balcerak, Andy Zhu, Benedikt Wiestler, Bjoern Menze, John S. Lowengrub, Personalized predictions of Glioblastoma infiltration: Mathematical models, Physics-Informed Neural Networks and multimodal scans, Medical Image Analysis, Volume 101, 2025, 103423, ISSN 1361-8415, https://doi.org/10.1016/j.media.2024.103423.</blockquote>
+<blockquote>11- E. Konukoglu et al., "Image Guided Personalization of Reaction-Diffusion Type Tumor Growth Models Using Modified Anisotropic Eikonal Equations," in IEEE Transactions on Medical Imaging, vol. 29, no. 1, pp. 77-95, Jan. 2010, doi: 10.1109/TMI.2009.2026413 </blockquote>
+<blockquote>12- J. Lipková et al., "Personalized Radiotherapy Design for Glioblastoma: Integrating Mathematical Tumor Models, Multimodal Scans, and Bayesian Inference," in IEEE Transactions on Medical Imaging, vol. 38, no. 8, pp. 1875-1884, Aug. 2019, doi: 10.1109/TMI.2019.2902044.</blockquote>
 
 ## Authors
 
