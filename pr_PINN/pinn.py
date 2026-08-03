@@ -86,7 +86,16 @@ def lhs_sample_generator(n_points: int,
     -------
         tuple[torch.Tensor, ...]
             A tuple of Tensors of size dim+1, each Tensor of lenght n_points.
+
+    Raises
+    ------
+        ValueError
+            If dim is not 1, 2 or 3.
     """
+
+    if dim <= 0 or dim >= 4:
+        raise ValueError("dim must be either 1, 2 or 3")
+
     # create the points
     sampler = qmc.LatinHypercube(d=dim+1, seed=42)
     lhs_samples = sampler.random(n_points)
@@ -399,8 +408,12 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
             for the boundary condition and by calculating the initial condition
             loss inside the function, as the squared difference between the
             result obtained by the model and value_t0.
-    """
 
+    Raises
+    ------
+        ValueError
+            If mode is not "neumann", "dirichlet" or "exact".
+    """
     # initial condition loss
     u_pr = model(*coordinates, t=torch.zeros_like(t))
     if mode == 'exact':
@@ -432,7 +445,8 @@ def loss_function(*coordinates: torch.Tensor, mode: str = "dirichlet",
                                       value_z0=value_z0,
                                       value_z1=value_z1)
     else:
-        raise (NameError('Invalid mode'))
+        raise ValueError(
+            "mode must be dirichlet or neumann or exact")
 
     # residual loss
     loss_pde = torch.mean(pde_residual(*coordinates, t=t, model=model)**2)
@@ -462,7 +476,14 @@ def lhs_sample_generator_sphere_boundary(
         tuple[torch.Tensor, ...]
             the spatial coordinates of the generated points,
             made by dim Tensors of lenght n_points.
+
+    Raises
+    ------
+        ValueError
+            If dim is not 2 or 3.
     """
+    if dim <= 1 or dim >= 4:
+        raise ValueError("dim must be either 2 or 3")
 
     lhs_samples_tuple = lhs_sample_generator(
         n_points, dim-1)
@@ -505,7 +526,14 @@ def lhs_sample_generator_sphere_inside(
         tuple[torch.Tensor, ...]
             The coordinates of the generated points, made by
             dim+1 tensors of lenght n_points
+
+    Raises
+    ------
+        ValueError
+            If dim is not 2 or 3.
     """
+    if dim <= 1 or dim >= 4:
+        raise ValueError("dim must be either 2 or 3")
 
     lhs_samples_tuple = lhs_sample_generator(
         n_points, dim)  # points generated with lhs
@@ -599,7 +627,16 @@ def loss_function_sphere(*coordinates: torch.Tensor, t: torch.Tensor,
             The total loss, the sum of the boundary conditions loss calculated
             with neuman_condition_sphere, the initial condition loss and the
             physics loss calculated as the mean squared pde_residual.
+
+    Raises
+    ------
+        ValueError
+            If dim is not 2 or 3.
     """
+
+    if dim <= 1 or dim >= 4:
+        raise ValueError("dim must be either 2 or 3")
+
     # boundary loss
     boundary_coords = lhs_sample_generator_sphere_boundary(n_points, dim)
     loss_bc = neumann_condition_sphere(*boundary_coords, t=t, model=model)
@@ -691,8 +728,28 @@ def training_loop(n_epochs: int, n_neurons: int,
             The trained PINN.
         loss_list:list
             A list containing the loss every 10 epochs.
+
+    Raises
+    ------
+        ValueError
+            If any of the following conditions occur:
+            - dim is not 1, 2 or 3
+            - mode is not "neumann", "dirichlet", "exact" or "sphere"
+            - dim is different than 1 for mode "exact"
+            - dim is 1 for mode "sphere"
     """
 
+    if mode == 'sphere' and dim == 1:
+        raise ValueError('Mode sphere only works with dim!=1')
+    if mode == 'exact' and dim != 1:
+        raise ValueError('Mode exact only works with dim==1')
+    if dim <= 0 or dim >= 4:
+        raise ValueError("dim must be either 1, 2 or 3")
+    if (mode != "sphere" and mode != "dirichlet" and
+            mode != "neumann" and mode != "exact"):
+        raise ValueError("Invalid mode")
+
+    torch.manual_seed(42)
     model = PINN(n_neurons, dim)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -738,7 +795,7 @@ def training_loop(n_epochs: int, n_neurons: int,
 
 def training_loop_benchmarking(n_epochs: int, n_neurons: int,
                                n_points: int, dim: int,
-                               value_t0: float) -> tuple[nn.Module, list]:
+                               value_t0: float) -> nn.Module:
     """
     Runs n_epochs loops to train a PINN for the radially symmetrical case.
 
@@ -759,7 +816,15 @@ def training_loop_benchmarking(n_epochs: int, n_neurons: int,
     -------
         model:nn.Module
             The trained PINN.
+
+    Raises
+    ------
+        ValueError
+            If dim is not 2 or 3.
     """
+    if dim <= 1 or dim >= 4:
+        raise ValueError("dim must be either 2 or 3")
+
     model = PINN(n_neurons, 1)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -783,10 +848,12 @@ def training_loop_benchmarking(n_epochs: int, n_neurons: int,
     return model
 
 
-def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
+def solve_with_fipy(dim: int, mode: str,
+                    value_x0: float, value_x1: float,
                     value_y0: float, value_y1: float, value_z0: float,
                     value_z1: float,
-                    value_t0: float) -> list:
+                    value_t0: float,
+                    D: float = 0.01, R: float = 1) -> list:
     """
     Solves the equation with fipy with
     dirichlet or neumann boundary conditions for a
@@ -812,12 +879,28 @@ def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
             The dirichlet condition for z=1
         value_t0: float
             The initial condition.
+        D:float=0.01
+            The diffusion coefficient.
+        R:float=1
+            The reaction rate.
 
     Returns
     -------
         history:list
             A list containing u(vec(x), t) for 20^(dim+1) data points.
+
+        Raises
+    ------
+        ValueError
+            If any of the following conditions occur:
+            - dim is not 1, 2 or 3
+            - mode is not "neumann", "dirichlet"
     """
+
+    if dim <= 0 or dim >= 4:
+        raise ValueError("dim must be either 1, 2 or 3")
+    if mode != "neumann" and mode != "dirichlet":
+        raise ValueError("Invalid mode")
 
     nx = 20
     ny = nx
@@ -836,7 +919,7 @@ def solve_with_fipy(dim: int, mode: str, value_x0: float, value_x1: float,
     phi = CellVariable(name='solution variable', mesh=mesh, value=value_t0)
 
     # define kpp-fisher
-    eq = TransientTerm() == DiffusionTerm(coeff=0.01) + phi*(1-phi)
+    eq = TransientTerm() == DiffusionTerm(coeff=D) + R*phi*(1-phi)
 
     # set boundary conditions
     if mode == 'dirichlet':
@@ -915,7 +998,16 @@ def l2_loss_sphere(n_points: int, model: nn.Module,
         l2_loss_text: str
         A string containing the l2 loss and the maximum
         difference between the models.
+
+        Raises
+    ------
+        ValueError
+            If dim is not 1, 2 or 3.
     """
+
+    if dim <= 0 or dim >= 4:
+        raise ValueError("dim must be either 1, 2 or 3")
+
     # sample some points then calculate their radius
     *coords, t = list(lhs_sample_generator_sphere_inside(n_points, dim))
     radius = torch.sqrt(sum(c**2 for c in coords)).detach()
@@ -990,6 +1082,15 @@ def generate_plot(n_epochs: int, n_neurons: int,
         l2_loss:str
             Returns a string indicationg the l2_loss
             (and maximum difference if mode=sphere).
+
+    Raises
+    ------
+        ValueError
+            If any of the following conditions occur:
+            - dim is not 1, 2 or 3
+            - mode is not "neumann", "dirichlet", "exact" or "sphere"
+            - dim is different than 1 for mode "exact"
+            - dim is 1 for mode "sphere"
     """
 
     # make the parameters float to avoid errors with gradio
@@ -1004,9 +1105,14 @@ def generate_plot(n_epochs: int, n_neurons: int,
     value_t0 = float(value_t0)
 
     if mode == 'sphere' and dim == 1:
-        raise NameError('Mode sphere only works with dim!=1')
+        raise ValueError('Mode sphere only works with dim!=1')
     if mode == 'exact' and dim != 1:
-        raise NameError('Mode sphere only works with dim==1')
+        raise ValueError('Mode exact only works with dim==1')
+    if dim <= 0 or dim >= 4:
+        raise ValueError("dim must be either 1, 2 or 3")
+    if (mode != "sphere" and mode != "dirichlet" and
+            mode != "neumann" and mode != "exact"):
+        raise ValueError("Invalid mode")
 
     # collect the two solutions
     model, loss_list = training_loop(
@@ -1016,7 +1122,7 @@ def generate_plot(n_epochs: int, n_neurons: int,
     if mode == 'sphere':
         benchmarking_model = training_loop_benchmarking(
             n_epochs, n_neurons, n_points, dim, value_t0)
-    else:
+    elif mode != "exact":
         history = solve_with_fipy(dim, mode, value_x0,
                                   value_x1, value_y0, value_y1,
                                   value_z0, value_z1, value_t0)
@@ -1071,7 +1177,7 @@ def generate_plot(n_epochs: int, n_neurons: int,
         if dim == 3:
             u_pred_tensor = model(x_loss, y_loss, z_loss, t=t_loss)
             u_pred = model(x_test, y_test, z_test,
-                           t=torch.full_like(x_test, 0.5)).numpy()
+                           t=torch.full_like(x_test, 0.474)).numpy()
 
     losses = [item[0] for item in loss_list]
     epochs = [item[1] for item in loss_list]
@@ -1085,10 +1191,10 @@ def generate_plot(n_epochs: int, n_neurons: int,
         if mode == 'exact':
             u_exact = u_exact.reshape(20, 20)
 
-        fipy_matrices = [item[0] if isinstance(
-            item, (tuple, list)) else item for item in history]
-        u_fipy = np.stack(fipy_matrices, axis=-1)
         if mode != 'exact':
+            fipy_matrices = [item[0] if isinstance(
+                item, (tuple, list)) else item for item in history]
+            u_fipy = np.stack(fipy_matrices, axis=-1)
             u_exact_tensor = torch.Tensor(u_fipy).reshape(-1, 1)
             u_fipy = u_fipy.reshape(20, 20)
 
@@ -1098,9 +1204,11 @@ def generate_plot(n_epochs: int, n_neurons: int,
         fig.colorbar(c1, ax=ax1)
         if mode != "exact":
             c2 = ax2.contourf(x_test, t_test, u_fipy, levels=250, cmap='jet')
+            ax2.set_title('fipy')
         else:
             c2 = ax2.contourf(x_test, t_test, u_exact, levels=250, cmap='jet')
-        ax2.set_title('fipy')
+            ax2.set_title('exact')
+
         fig.colorbar(c2, ax=ax2)
 
         # loss plot
